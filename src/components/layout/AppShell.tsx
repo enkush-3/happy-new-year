@@ -5,7 +5,7 @@ export default function AppShell() {
   return (
     <div className="app-shell">
       <div className="ambient-snow" aria-hidden="true">
-        {Array.from({ length: 14 }, (_, index) => (
+        {Array.from({ length: 36 }, (_, index) => (
           <i
             key={index}
             style={{
@@ -23,7 +23,7 @@ export default function AppShell() {
       <main className="app-main">
         <Outlet />
       </main>
-      <footer className="app-footer"><span aria-hidden="true">❄</span> Багахан гэрэл, их хайртай шинэ жил. <span aria-hidden="true">❄</span></footer>
+      <footer className="app-footer"><span aria-hidden="true">✦</span> Баярын гэрэл асаж эхэлсэн шинэ жил <span aria-hidden="true">✦</span></footer>
     </div>
   );
 }

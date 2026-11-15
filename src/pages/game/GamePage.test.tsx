@@ -29,8 +29,15 @@ describe("shared game result routes", () => {
   it("restores the exact result from its share URL", () => {
     renderAt(`/games/gift-catcher?result=${encodeGameResult(sharedResult)}`);
 
-    expect(screen.getByRole("heading", { level: 2, name: "Бэлэг баригч" })).toBeInTheDocument();
-    expect(screen.getByText(/120 оноо · 12 бэлэг тослоо/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Бэлэг баригч" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: "Бэлэг баригч" })).toHaveLength(1);
+    expect(screen.getAllByRole("region", { name: "Бэлэг баригч" })).toHaveLength(1);
+    expect(screen.getByLabelText("120 оноо · 12 бэлэг тослоо")).toBeInTheDocument();
+    expect(screen.getByText("120", { selector: ".game-result-score" })).toBeInTheDocument();
+    expect(screen.getByText("12 бэлэг амжилттай тослоо")).toBeInTheDocument();
+    expect(document.querySelectorAll(".game-result-stat")).toHaveLength(4);
+    expect(screen.getByRole("link", { name: "Дараагийн тоглоом: Цасан ширхэг дарагч" })).toHaveAttribute("href", "/games/snowflake-clicker");
+    expect(screen.getByRole("link", { name: /бүх тоглоом/i })).toHaveClass("game-result-back");
     expect(screen.getByRole("button", { name: /дахин тоглох/i })).toBeInTheDocument();
   });
 
@@ -61,10 +68,10 @@ describe("shared game result routes", () => {
     act(() => vi.advanceTimersByTime(8_001));
     fireEvent.click(screen.getByRole("button", { name: "Зогсоох" }));
 
-    expect(screen.getByText(/Хэмжсэн хугацаа: 8\.001 сек/)).toBeInTheDocument();
-    expect(screen.getByText(/Зорилтот хугацаа: 8\.001 сек/)).toBeInTheDocument();
-    expect(screen.getByText(/Энэ сессийн шилдэг:/)).toBeInTheDocument();
-    expect(screen.getByText(/Энэ төхөөрөмжийн шилдэг:/)).toBeInTheDocument();
+    expect(screen.getByText("Хэмжсэн хугацаа").nextElementSibling).toHaveTextContent("8.001 сек");
+    expect(screen.getByText("Зорилтот хугацаа").nextElementSibling).toHaveTextContent("8.001 сек");
+    expect(screen.getByText("Сессийн шилдэг").nextElementSibling).toHaveTextContent("Зорилтоос 0 мс зөрлөө");
+    expect(screen.getByText("Төхөөрөмжийн дээд амжилт").nextElementSibling).toHaveTextContent("Зорилтоос 0 мс зөрлөө");
     expect(window.sessionStorage.getItem("happy-new-year:best:session:countdown-stopper")).not.toBeNull();
     expect(window.localStorage.getItem("happy-new-year:best:device:countdown-stopper")).not.toBeNull();
   });
@@ -83,8 +90,8 @@ describe("shared game result routes", () => {
 
     renderAt(`/games/countdown-stopper?result=${encodeGameResult(result)}`);
 
-    expect(screen.getByText(/Хэмжсэн хугацаа: 8\.000 сек/)).toBeInTheDocument();
-    expect(screen.getByText(/Зорилтот хугацаа: 8\.000 сек/)).toBeInTheDocument();
+    expect(screen.getByText("Хэмжсэн хугацаа").nextElementSibling).toHaveTextContent("8.000 сек");
+    expect(screen.getByText("Зорилтот хугацаа").nextElementSibling).toHaveTextContent("8.000 сек");
     expect(sessionWrite).not.toHaveBeenCalled();
   });
 });

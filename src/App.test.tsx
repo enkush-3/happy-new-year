@@ -21,11 +21,25 @@ describe("Happy New Year game hub", () => {
     expect(screen.getByText(/хоног/)).toBeInTheDocument();
   });
 
+  it("shows a denser snowfall behind the app", () => {
+    renderApp("/");
+
+    expect(document.querySelectorAll(".ambient-snow > i")).toHaveLength(36);
+  });
+
+  it("keeps one clear games call to action on the home page", () => {
+    renderApp("/");
+
+    const heroCta = screen.getByRole("link", { name: /Тоглоомууд үзэх/ });
+    expect(heroCta).toHaveClass("hero-cta");
+    expect(screen.queryByRole("link", { name: /Бүх тоглоом/ })).not.toBeInTheDocument();
+  });
+
   it("lists the six public games, includes the tree decorator, and omits Fortune Cookie", () => {
     renderApp("/games");
 
     expect(screen.getByRole("heading", { name: "Тоглоомууд" })).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: /Тоглох/ })).toHaveLength(6);
+    expect(document.querySelectorAll(".games-page__grid a.game-card")).toHaveLength(6);
     expect(document.querySelector('a[href="/games/fortune-cookie"]')).toBeNull();
   });
 

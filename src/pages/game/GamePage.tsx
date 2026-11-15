@@ -6,7 +6,7 @@ import GiftCatcherGame from "../../features/games/gift-catcher/GiftCatcherGame";
 import SleighRunnerGame from "../../features/games/sleigh-runner/SleighRunnerGame";
 import SnowflakeClickerGame from "../../features/games/snowflake-clicker/SnowflakeClickerGame";
 import TriviaGame from "../../features/games/trivia/TriviaGame";
-import { findGame } from "../../features/games/gameCatalog";
+import { findGame, gameCatalog } from "../../features/games/gameCatalog";
 import GameResultCard from "../../features/games/shared/GameResultCard";
 import { decodeGameResult, encodeGameResult } from "../../features/games/shared/gameShare";
 import { bestRecordManager, type BestRecords } from "../../features/games/shared/bestRecords";
@@ -44,6 +44,8 @@ export default function GamePage() {
   }
 
   if (game.id === "tree-decorator") return <TreeGame />;
+  const currentGameIndex = gameCatalog.findIndex((catalogGame) => catalogGame.id === game.id);
+  const nextGame = gameCatalog[(currentGameIndex + 1) % gameCatalog.length] ?? game;
 
   function completeGame(nextResult: GameResult) {
     setBestRecords(bestRecordManager.record(nextResult));
@@ -57,16 +59,20 @@ export default function GamePage() {
   }
 
   return (
-    <section className="game-page" aria-labelledby="game-page-title">
+    <section className={`game-page${result ? " is-result" : ""}`} aria-labelledby={result ? "game-result-title" : "game-page-title"}>
       <div className="game-page-heading">
-        <Link to="/games" className="back-link"><span aria-hidden="true">←</span> Бүх тоглоом</Link>
-        <p className="eyebrow"><span aria-hidden="true">✧</span> 2D БАЯРЫН ТОГЛООМ <span aria-hidden="true">✧</span></p>
-        <h1 id="game-page-title">{game.title}</h1>
-        <p className="hero-copy">{game.description}</p>
+        <Link to="/games" className={`back-link${result ? " game-result-back" : ""}`}><span aria-hidden="true">←</span> Бүх тоглоом</Link>
+        {!result && (
+          <>
+            <p className="eyebrow"><span aria-hidden="true">✧</span> 2D БАЯРЫН ТОГЛООМ <span aria-hidden="true">✧</span></p>
+            <h1 id="game-page-title">{game.title}</h1>
+            <p className="hero-copy">{game.description}</p>
+          </>
+        )}
       </div>
       <div className={`game-play-surface${result ? " is-result" : ""}`}>
         {result ? (
-          <GameResultCard result={result} bestRecords={bestRecords} onReplay={replay} />
+          <GameResultCard result={result} bestRecords={bestRecords} nextGame={nextGame} onReplay={replay} />
         ) : (
           <GameInstance gameId={game.id} onComplete={completeGame} />
         )}

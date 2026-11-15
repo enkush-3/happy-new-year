@@ -174,28 +174,35 @@ describe("Tree3DScene ornament gestures", () => {
     expect(editor.history).toEqual([testDesign]);
   });
 
-  it("lets the viewer zoom and rotate the tree, then restore the front view", async () => {
-    renderEditor("orbit");
-    await waitFor(() => expect(screen.getByRole("button", { name: "Ойртуулах" })).toBeInTheDocument());
+  it("uses scroll gestures to orbit and zoom without an on-screen arrow pad", async () => {
+    const editor = renderEditor("orbit");
+    await waitFor(() => expect(editor.container.querySelector(".tree-3d-canvas")).not.toBeNull());
     const host = screen.getByRole("group", { name: "3D гацуурыг харах" });
     const frontZ = threeHarness.camera.position.z;
 
-    fireEvent.click(screen.getByRole("button", { name: "Ойртуулах" }));
+    expect(screen.getByText(/touchpad-аа хажуу тийш гүйлгэж эргүүлнэ/i)).toBeInTheDocument();
+    expect(editor.container.querySelector(".tree-3d-view-controls")).toBeNull();
+    const verticalWheel = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: -80 });
+    host.dispatchEvent(verticalWheel);
+    expect(verticalWheel.defaultPrevented).toBe(true);
     expect(threeHarness.camera.position.z).toBeLessThan(frontZ);
 
-    fireEvent.pointerDown(host, { pointerId: 9, button: 0, clientX: 140, clientY: 170 });
-    fireEvent.pointerMove(host, { pointerId: 9, clientX: 220, clientY: 200 });
-    fireEvent.pointerUp(host, { pointerId: 9, clientX: 220, clientY: 200 });
+    fireEvent.wheel(host, { deltaX: 80, deltaY: 0 });
     expect(threeHarness.camera.position.x).not.toBeCloseTo(0);
 
-    fireEvent.click(screen.getByRole("button", { name: "Харах өнцгийг анхны байдалд оруулах" }));
+    const previousHeight = threeHarness.camera.position.y;
+    fireEvent.wheel(host, { deltaY: 80, shiftKey: true });
+    expect(threeHarness.camera.position.y).not.toBeCloseTo(previousHeight);
+
+    host.focus();
+    fireEvent.keyDown(host, { key: "Home" });
     expect(threeHarness.camera.position.x).toBeCloseTo(0);
     expect(threeHarness.camera.position.z).toBeCloseTo(frontZ);
   });
 
   it("lets keyboard users change the 3D view without changing ornaments", async () => {
     const editor = renderEditor("orbit");
-    await waitFor(() => expect(screen.getByRole("button", { name: "Ойртуулах" })).toBeInTheDocument());
+    await waitFor(() => expect(editor.container.querySelector(".tree-3d-canvas")).not.toBeNull());
     const host = screen.getByRole("group", { name: "3D гацуурыг харах" });
     const initialPosition = { ...threeHarness.camera.position };
 

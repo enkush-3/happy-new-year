@@ -50,14 +50,6 @@ export default function CountdownPage() {
           Тоглоомууд үзэх <span aria-hidden="true">→</span>
         </Link>
       </div>
-      <div className="home-note-row">
-        <div className="home-note-icon" aria-hidden="true">✦</div>
-        <div>
-          <h2>Баярын хүлээлтийг хөгжилтэй өнгөрүүлээрэй</h2>
-          <p>Жижигхэн тоглоом тоглож, бүтээлээ найзуудтайгаа хуваалцаарай.</p>
-        </div>
-        <Link to={GAMES_PATH} className="text-link">Бүх тоглоом <span aria-hidden="true">↗</span></Link>
-      </div>
     </section>
   );
 }

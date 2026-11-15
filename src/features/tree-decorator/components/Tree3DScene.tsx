@@ -83,6 +83,7 @@ export default function Tree3DScene({
     let prefersReducedMotion = motionQuery?.matches ?? false;
     const host = hostRef.current;
     if (!host) return;
+    host.addEventListener("wheel", onOrbitWheel, { passive: false });
 
     function animateFrame(time: number) {
       if (!mounted || !runtime || document.visibilityState === "hidden") return;
@@ -347,6 +348,7 @@ export default function Tree3DScene({
     void mountScene();
     return () => {
       mounted = false;
+      host.removeEventListener("wheel", onOrbitWheel);
       resizeObserver?.disconnect();
       window.removeEventListener("resize", onResize);
       document.removeEventListener("visibilitychange", onVisibilityChange);
@@ -539,14 +541,22 @@ export default function Tree3DScene({
     runtime.renderer.render(runtime.scene, runtime.camera);
   }
 
-  function onOrbitWheel(event: React.WheelEvent<HTMLDivElement>) {
+  function onOrbitWheel(event: WheelEvent) {
     if (propsRef.current.viewMode !== "orbit") return;
+    if (event.deltaX === 0 && event.deltaY === 0) return;
     event.preventDefault();
-    zoomCamera(Math.sign(event.deltaY) * 0.24);
-  }
-
-  function stopOrbitControlPointer(event: ReactPointerEvent<HTMLButtonElement>) {
-    event.stopPropagation();
+    if (event.shiftKey) {
+      rotateCamera(0, clamp(-event.deltaY * 0.002, -0.12, 0.12));
+      return;
+    }
+    if (event.deltaX !== 0) {
+      rotateCamera(
+        -clamp(event.deltaX * 0.003, -0.16, 0.16),
+        clamp(event.deltaY * 0.002, -0.12, 0.12),
+      );
+      return;
+    }
+    zoomCamera(clamp(event.deltaY * 0.002, -0.45, 0.45));
   }
 
   return (
@@ -561,7 +571,6 @@ export default function Tree3DScene({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
       onKeyDown={onKeyDown}
-      onWheel={onOrbitWheel}
     >
       {status !== "ready" && <div className="tree-3d-fallback">{fallback}</div>}
       {status === "loading" && <p className="tree-3d-status" role="status">3D модыг бэлдэж байна…</p>}
@@ -569,20 +578,9 @@ export default function Tree3DScene({
       {status === "ready" && (
         <span className="tree-3d-instructions" aria-live="polite">
           {viewMode === "orbit"
-            ? "Чирэх эсвэл суман товчоор өнцөг солино · +/- ойртуулна · Home анхны өнцөг"
+            ? "Чирж эсвэл touchpad-аа хажуу тийш гүйлгэж эргүүлнэ · Дугуй, touchpad эсвэл чимхэлтээр ойртуулна · Shift + гүйлгэхээр өндрөө солино · Home анхны өнцөг"
             : "Модон дээр товшиж чимэглэл нэмэх эсвэл чимэглэлээ чирж байрлуулна."}
         </span>
-      )}
-      {status === "ready" && viewMode === "orbit" && (
-        <div className="tree-3d-view-controls" role="group" aria-label="3D модны харах өнцөг">
-          <button type="button" aria-label="Зүүн өнцөг харах" title="Зүүн өнцөг" onPointerDown={stopOrbitControlPointer} onClick={() => rotateCamera(-0.16, 0)}>←</button>
-          <button type="button" aria-label="Дээш өнцөг харах" title="Дээш харах" onPointerDown={stopOrbitControlPointer} onClick={() => rotateCamera(0, 0.1)}>↑</button>
-          <button type="button" aria-label="Баруун өнцөг харах" title="Баруун өнцөг" onPointerDown={stopOrbitControlPointer} onClick={() => rotateCamera(0.16, 0)}>→</button>
-          <button type="button" aria-label="Ойртуулах" title="Ойртуулах" onPointerDown={stopOrbitControlPointer} onClick={() => zoomCamera(-0.45)}>+</button>
-          <button type="button" aria-label="Харах өнцгийг анхны байдалд оруулах" title="Анхны өнцөг" onPointerDown={stopOrbitControlPointer} onClick={resetCamera}>↺</button>
-          <button type="button" aria-label="Доош өнцөг харах" title="Доош харах" onPointerDown={stopOrbitControlPointer} onClick={() => rotateCamera(0, -0.1)}>↓</button>
-          <button type="button" aria-label="Холдуулах" title="Холдуулах" onPointerDown={stopOrbitControlPointer} onClick={() => zoomCamera(0.45)}>−</button>
-        </div>
       )}
     </div>
   );
