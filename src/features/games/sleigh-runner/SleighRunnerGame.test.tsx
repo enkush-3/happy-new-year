@@ -6,7 +6,7 @@ import SleighRunnerGame from "./SleighRunnerGame";
 describe("SleighRunnerGame", () => {
   afterEach(() => vi.useRealTimers());
 
-  it("uses arrow keys to steer, jump, and slide", () => {
+  it("uses Arrow and A/D keys to steer, and arrow keys to jump and slide after starting", () => {
     render(<SleighRunnerGame onComplete={vi.fn()} />);
 
     expect(screen.getByRole("img", { name: "Чарганы 2D өвлийн уулын уралдаан" })).toBeInTheDocument();
@@ -15,12 +15,45 @@ describe("SleighRunnerGame", () => {
     expect(player).toHaveStyle({ left: "50%" });
     fireEvent.keyDown(window, { key: "ArrowLeft" });
     expect(player).toHaveStyle({ left: "23%" });
+    fireEvent.keyDown(window, { key: "d" });
+    expect(player).toHaveStyle({ left: "50%" });
+    fireEvent.keyDown(window, { key: "a" });
+    expect(player).toHaveStyle({ left: "23%" });
+    fireEvent.keyDown(window, { key: "ф", code: "KeyD" });
+    expect(player).toHaveStyle({ left: "50%" });
+    fireEvent.keyDown(window, { key: "а", code: "KeyA" });
+    expect(player).toHaveStyle({ left: "23%" });
     fireEvent.keyDown(window, { key: "ArrowUp" });
     expect(player).toHaveAttribute("data-jumping", "true");
     fireEvent.keyDown(window, { key: "ArrowDown" });
 
     expect(screen.getByRole("status", { name: "Гүйж байна" })).toBeInTheDocument();
     expect(player).toHaveAttribute("data-sliding", "true");
+  });
+
+  it("ignores steering and action keys outside a run or while typing", () => {
+    render(<SleighRunnerGame onComplete={vi.fn()} />);
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    fireEvent.keyDown(window, { key: "a" });
+    fireEvent.keyDown(window, { key: "ArrowUp" });
+    expect(screen.queryByTestId("runner-player")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Уралдаж эхлэх" }));
+    const player = screen.getByTestId("runner-player");
+    const input = document.createElement("input");
+    const editable = document.createElement("div");
+    editable.setAttribute("contenteditable", "true");
+    document.body.append(input, editable);
+
+    fireEvent.keyDown(input, { key: "a" });
+    fireEvent.keyDown(editable, { key: "ArrowLeft" });
+    expect(fireEvent.keyDown(input, { key: "ArrowUp" })).toBe(true);
+    expect(fireEvent.keyDown(editable, { key: "ArrowRight" })).toBe(true);
+    expect(player).toHaveAttribute("data-lane", "1");
+    expect(player).toHaveAttribute("data-jumping", "false");
+
+    input.remove();
+    editable.remove();
   });
 
   it("ends the run on an obstacle and reports the distance result once", () => {

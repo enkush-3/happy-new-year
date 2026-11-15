@@ -1,4 +1,5 @@
 import type { GameResult, GameResultPresentation, GameId } from "./types";
+import { COUNTDOWN_STOPPER_MAX_TARGET_MS, COUNTDOWN_STOPPER_MIN_TARGET_MS } from "../countdown-stopper/model";
 
 const maxEncodedLength = 2048;
 const maxDecodedBytes = 1536;
@@ -51,10 +52,11 @@ export function presentGameResult(result: GameResult): GameResultPresentation {
           details: ["Яг хэмжсэн хугацаа хадгалагдаагүй.", "Хуучин холбоос зорилтот хугацааг хадгалаагүй."],
         };
       }
+      const targetMs = "targetMs" in result && result.targetMs !== undefined ? result.targetMs : 20_270;
       return {
         title: "Яг цагт нь зогсоо",
         text: `Зорилтоос ${result.deviationMs} мс зөрлөө`,
-        details: [`Хэмжсэн хугацаа: ${formatSeconds(result.elapsedMs, 3)} сек`, `Зорилтот хугацаа: 20.270 сек`],
+        details: [`Хэмжсэн хугацаа: ${formatSeconds(result.elapsedMs, 3)} сек`, `Зорилтот хугацаа: ${formatSeconds(targetMs, 3)} сек`],
       };
     case "sleigh-runner":
       return {
@@ -94,9 +96,11 @@ function isGameResult(value: unknown): value is GameResult {
       if (!isBoundedInt(result.deviationMs, 0, 86_400_000) ||
         !isBoundedInt(result.score, 0, 1_000) ||
         result.score !== Math.max(0, 1_000 - result.deviationMs)) return false;
-      if (result.elapsedMs === undefined) return true;
-      return isBoundedInt(result.elapsedMs, 0, 86_400_000) &&
-        result.deviationMs === Math.abs(result.elapsedMs - 20_270);
+      if (result.elapsedMs === undefined) return result.targetMs === undefined;
+      if (!isBoundedInt(result.elapsedMs, 0, 86_400_000)) return false;
+      if (result.targetMs === undefined) return result.deviationMs === Math.abs(result.elapsedMs - 20_270);
+      return isBoundedInt(result.targetMs, COUNTDOWN_STOPPER_MIN_TARGET_MS, COUNTDOWN_STOPPER_MAX_TARGET_MS) &&
+        result.deviationMs === Math.abs(result.elapsedMs - result.targetMs);
     case "sleigh-runner":
       return isBoundedInt(result.distance, 0, 1_000_000) && isBoundedInt(result.giftsCaught, 0, 1_000_000);
     case "trivia":

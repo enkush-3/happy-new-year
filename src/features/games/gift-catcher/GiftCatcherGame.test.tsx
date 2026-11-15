@@ -28,21 +28,53 @@ describe("gift catcher model", () => {
 describe("GiftCatcherGame", () => {
   afterEach(() => vi.useRealTimers());
 
-  it("moves the basket with keyboard and completes at the end of its 30-second round", () => {
+  it("moves the basket with global Arrow and A/D keys after starting and completes the round", () => {
     const onComplete = vi.fn();
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     vi.useFakeTimers();
     render(<GiftCatcherGame onComplete={onComplete} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Тоглож эхлэх" }));
-    const arena = screen.getByRole("application", { name: "Бэлэг баригч тоглоом" });
     const basket = screen.getByTestId("gift-catcher-basket");
-    const before = basket.getAttribute("style");
-    fireEvent.keyDown(arena, { key: "ArrowRight" });
-    expect(basket.getAttribute("style")).not.toBe(before);
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(basket).toHaveStyle({ left: "56%" });
+    fireEvent.keyDown(window, { key: "a" });
+    expect(basket).toHaveStyle({ left: "50%" });
+    fireEvent.keyDown(window, { key: "d" });
+    expect(basket).toHaveStyle({ left: "56%" });
+    fireEvent.keyDown(window, { key: "ф", code: "KeyA" });
+    expect(basket).toHaveStyle({ left: "50%" });
+    fireEvent.keyDown(window, { key: "а", code: "KeyD" });
+    expect(basket).toHaveStyle({ left: "56%" });
 
     act(() => vi.advanceTimersByTime(30_100));
     expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ gameId: "gift-catcher", elapsedMs: 30_000 }));
+  });
+
+  it("does not handle keyboard input while the round is stopped or while typing", () => {
+    vi.useFakeTimers();
+    render(<GiftCatcherGame onComplete={vi.fn()} />);
+    const basket = screen.getByTestId("gift-catcher-basket");
+
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(basket).toHaveStyle({ left: "50%" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Тоглож эхлэх" }));
+    const input = document.createElement("input");
+    const editable = document.createElement("div");
+    editable.setAttribute("contenteditable", "true");
+    document.body.append(input, editable);
+
+    fireEvent.keyDown(input, { key: "d" });
+    expect(fireEvent.keyDown(input, { key: "ArrowRight" })).toBe(true);
+    expect(fireEvent.keyDown(editable, { key: "ArrowRight" })).toBe(true);
+    expect(basket).toHaveStyle({ left: "50%" });
+
+    input.remove();
+    editable.remove();
+    act(() => vi.advanceTimersByTime(30_100));
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(basket).toHaveStyle({ left: "50%" });
   });
 
   it("pauses the round while the document is hidden", () => {

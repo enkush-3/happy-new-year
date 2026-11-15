@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import TreeScene, { clampToTree, treeCanvasPointFromClient, treePointFromClient, type TreeTool } from "./components/TreeScene";
-import Tree3DScene from "./components/Tree3DScene";
+import Tree3DScene, { defaultTreeCameraView, type TreeCameraView } from "./components/Tree3DScene";
 import {
   addDecoration,
   addStroke,
@@ -64,6 +64,7 @@ export default function TreeGame() {
   const [drawingTool, setDrawingTool] = useState<TreeTool>(initialShare.design.treeMode === "custom" ? "draw" : "decorate");
   const [viewMode, setViewMode] = useState<"3d" | "2d">("3d");
   const [cameraMode, setCameraMode] = useState<"edit" | "orbit">("edit");
+  const cameraViewRef = useRef<TreeCameraView>({ ...defaultTreeCameraView });
   const [penColor, setPenColor] = useState<TreePenColor>("snow");
   const [penWidth, setPenWidth] = useState<TreePenWidth>(8);
   const [history, setHistory] = useState<{ past: TreeDesign[]; future: TreeDesign[] }>({ past: [], future: [] });
@@ -484,7 +485,7 @@ export default function TreeGame() {
             <div className="tree-view-switch" role="group" aria-label="Модны харагдац">
               <button className={`tool-chip${viewMode === "3d" ? " is-active" : ""}`} type="button" aria-pressed={viewMode === "3d"} onClick={() => setViewMode("3d")}>3D мод</button>
               <button className={`tool-chip${viewMode === "2d" ? " is-active" : ""}`} type="button" aria-pressed={viewMode === "2d"} onClick={() => setViewMode("2d")}>2D зураг</button>
-              {viewMode === "3d" && <button className={`tool-chip${cameraMode === "orbit" ? " is-active" : ""}`} type="button" aria-pressed={cameraMode === "orbit"} onClick={() => setCameraMode(cameraMode === "orbit" ? "edit" : "orbit")}>Модоо эргүүлж харах</button>}
+              {viewMode === "3d" && <button className={`tool-chip${cameraMode === "orbit" ? " is-active" : ""}`} type="button" aria-label={cameraMode === "orbit" ? "Засварлах горимд буцах" : "Модны өнцгийг өөрчлөх"} aria-pressed={cameraMode === "orbit"} onClick={() => setCameraMode(cameraMode === "orbit" ? "edit" : "orbit")}>{cameraMode === "orbit" ? "Засварлах горим" : "Модны өнцөг"}</button>}
             </div>
           )}
 
@@ -501,6 +502,7 @@ export default function TreeGame() {
                 selectedDecorationId={selectedDecorationId}
                 selectedKind={selectedKind}
                 viewMode={cameraMode}
+                cameraViewRef={cameraViewRef}
                 onCanvas={handleCanvas}
                 onPlace={(kind, point) => placeDecoration(kind, point.x, point.y, point.angle)}
                 onMove={handleMove3D}

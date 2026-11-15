@@ -20,7 +20,10 @@ function renderAt(path: string) {
   );
 }
 
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe("shared game result routes", () => {
   it("restores the exact result from its share URL", () => {
@@ -48,15 +51,18 @@ describe("shared game result routes", () => {
   it("shows stopper elapsed details and persists local session/device bests", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-11-15T00:00:00.000Z"));
+    vi.spyOn(Math, "random").mockReturnValue(0.6001);
     window.sessionStorage.clear();
     window.localStorage.clear();
     renderAt("/games/countdown-stopper");
 
+    expect(screen.getByText("Зорилт").parentElement).toHaveTextContent("8.001 сек");
     fireEvent.click(screen.getByRole("button", { name: "Тоглож эхлэх" }));
-    act(() => vi.advanceTimersByTime(20_270));
+    act(() => vi.advanceTimersByTime(8_001));
     fireEvent.click(screen.getByRole("button", { name: "Зогсоох" }));
 
-    expect(screen.getByText(/Хэмжсэн хугацаа: 20\.270 сек/)).toBeInTheDocument();
+    expect(screen.getByText(/Хэмжсэн хугацаа: 8\.001 сек/)).toBeInTheDocument();
+    expect(screen.getByText(/Зорилтот хугацаа: 8\.001 сек/)).toBeInTheDocument();
     expect(screen.getByText(/Энэ сессийн шилдэг:/)).toBeInTheDocument();
     expect(screen.getByText(/Энэ төхөөрөмжийн шилдэг:/)).toBeInTheDocument();
     expect(window.sessionStorage.getItem("happy-new-year:best:session:countdown-stopper")).not.toBeNull();
@@ -69,14 +75,16 @@ describe("shared game result routes", () => {
     const sessionWrite = vi.spyOn(Storage.prototype, "setItem");
     const result = {
       gameId: "countdown-stopper" as const,
-      elapsedMs: 20_270,
+      elapsedMs: 8_000,
+      targetMs: 8_000,
       deviationMs: 0,
       score: 1_000,
     };
 
     renderAt(`/games/countdown-stopper?result=${encodeGameResult(result)}`);
 
-    expect(screen.getByText(/Хэмжсэн хугацаа: 20\.270 сек/)).toBeInTheDocument();
+    expect(screen.getByText(/Хэмжсэн хугацаа: 8\.000 сек/)).toBeInTheDocument();
+    expect(screen.getByText(/Зорилтот хугацаа: 8\.000 сек/)).toBeInTheDocument();
     expect(sessionWrite).not.toHaveBeenCalled();
   });
 });

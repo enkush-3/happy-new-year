@@ -171,11 +171,13 @@ export default function SleighRunnerGame({ onComplete }: SleighRunnerGameProps) 
   useEffect(() => {
     if (game.status !== "running") return;
     function onKeyDown(event: KeyboardEvent) {
+      if (isTextEntryTarget(event.target)) return;
       if ((event.code === "Space" || event.key === " ") && isInteractiveTarget(event.target)) return;
-      if (event.key === "ArrowLeft") {
+      const key = event.key.toLowerCase();
+      if (event.key === "ArrowLeft" || event.code === "KeyA" || key === "a") {
         event.preventDefault();
         steer(-1);
-      } else if (event.key === "ArrowRight") {
+      } else if (event.key === "ArrowRight" || event.code === "KeyD" || key === "d") {
         event.preventDefault();
         steer(1);
       } else if (event.key === "ArrowUp" || event.code === "Space") {
@@ -259,7 +261,7 @@ export default function SleighRunnerGame({ onComplete }: SleighRunnerGameProps) 
         {game.status === "ready" && <div className="runner-intro"><span aria-hidden="true">🛷</span><p>Уулын замаар гулгаж бэлэг цуглуулаарай.</p></div>}
       </div>
 
-      <p className="runner-hint">← / → чиглүүлнэ · ↑ үсэрнэ · ↓ намхан мөчрийн доогуур гулсана · Space үсэрнэ</p>
+      <p className="runner-hint">← / → эсвэл A / D чиглүүлнэ · ↑ үсэрнэ · ↓ намхан мөчрийн доогуур гулсана · Space үсэрнэ</p>
       <div className="runner-controls">
         {game.status === "running" ? (
           <div className="runner-touch-controls" aria-label="Чарганы удирдлага">
@@ -279,6 +281,12 @@ export default function SleighRunnerGame({ onComplete }: SleighRunnerGameProps) 
 
 function isInteractiveTarget(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && Boolean(
-    target.closest("button, a, input, textarea, select, [contenteditable='true']"),
+    target.closest("button, a, input, textarea, select, [contenteditable]:not([contenteditable='false'])"),
+  );
+}
+
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && Boolean(
+    target.closest("input, textarea, select, [contenteditable]:not([contenteditable='false'])"),
   );
 }

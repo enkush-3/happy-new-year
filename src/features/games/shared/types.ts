@@ -9,6 +9,7 @@ export type GameId =
 export type GameResult =
   | { gameId: "gift-catcher"; score: number; giftsCaught: number; hazardsHit: number; elapsedMs: number }
   | { gameId: "snowflake-clicker"; score: number; hits: number; elapsedMs: number }
+  | { gameId: "countdown-stopper"; elapsedMs: number; targetMs: number; deviationMs: number; score: number }
   | { gameId: "countdown-stopper"; elapsedMs: number; deviationMs: number; score: number }
   | { gameId: "countdown-stopper"; deviationMs: number; score: number }
   | { gameId: "sleigh-runner"; distance: number; giftsCaught: number }

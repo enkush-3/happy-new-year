@@ -64,7 +64,7 @@ export default function GamePage() {
         <h1 id="game-page-title">{game.title}</h1>
         <p className="hero-copy">{game.description}</p>
       </div>
-      <div className="game-play-surface">
+      <div className={`game-play-surface${result ? " is-result" : ""}`}>
         {result ? (
           <GameResultCard result={result} bestRecords={bestRecords} onReplay={replay} />
         ) : (

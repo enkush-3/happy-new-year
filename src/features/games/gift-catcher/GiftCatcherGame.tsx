@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { GIFT_CATCHER_DURATION_MS, GIFT_CATCHER_STARTING_LIVES, moveBasket, positionBasketAt, resolveCatches, type CatchStats, type FallingObject, type FallingObjectKind } from "./model";
 import "./gift-catcher.css";
 
@@ -49,6 +49,26 @@ export default function GiftCatcherGame({ onComplete }: GiftCatcherGameProps) {
   const nextObjectAtMs = useRef(0);
   const hiddenAt = useRef<number | null>(null);
   const resultSent = useRef(false);
+
+  useEffect(() => {
+    if (game.status !== "running") return;
+
+    function onKeyDown(event: globalThis.KeyboardEvent) {
+      if (isTextEntryTarget(event.target) || gameRef.current.status !== "running") return;
+      const key = event.key.toLowerCase();
+      const direction = event.key === "ArrowLeft" || event.code === "KeyA" || key === "a"
+        ? -1
+        : event.key === "ArrowRight" || event.code === "KeyD" || key === "d"
+          ? 1
+          : 0;
+      if (!direction) return;
+      event.preventDefault();
+      setGame((current) => current.status === "running" ? { ...current, basketX: moveBasket(current.basketX, direction) } : current);
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [game.status]);
 
   useEffect(() => {
     if (game.status !== "running") return;
@@ -114,16 +134,6 @@ export default function GiftCatcherGame({ onComplete }: GiftCatcherGameProps) {
     setGame(nextGame);
   }
 
-  function onArenaKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key === "ArrowLeft" || event.key.toLowerCase() === "a") {
-      event.preventDefault();
-      setGame((current) => current.status === "running" ? { ...current, basketX: moveBasket(current.basketX, -1) } : current);
-    } else if (event.key === "ArrowRight" || event.key.toLowerCase() === "d") {
-      event.preventDefault();
-      setGame((current) => current.status === "running" ? { ...current, basketX: moveBasket(current.basketX, 1) } : current);
-    }
-  }
-
   function onArenaPointerMove(event: PointerEvent<HTMLDivElement>) {
     if (game.status !== "running") return;
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -154,7 +164,6 @@ export default function GiftCatcherGame({ onComplete }: GiftCatcherGameProps) {
         role="application"
         aria-label="Бэлэг баригч тоглоом"
         tabIndex={0}
-        onKeyDown={onArenaKeyDown}
         onPointerMove={onArenaPointerMove}
       >
         <span className="gift-catcher__cloud gift-catcher__cloud--one" aria-hidden="true">☁</span>
@@ -197,6 +206,12 @@ export default function GiftCatcherGame({ onComplete }: GiftCatcherGameProps) {
       </div>
       <p className="mini-game__hint">Хулганаар чирэх, суман товч эсвэл A/D дарж сагсаа хөдөлгөнө.</p>
     </section>
+  );
+}
+
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && Boolean(
+    target.closest("input, textarea, select, [contenteditable]:not([contenteditable='false'])"),
   );
 }
 

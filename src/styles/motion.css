@@ -4,10 +4,20 @@
 @keyframes ornament-appear { from { opacity: 0; transform: scale(.35) rotate(-16deg); } to { opacity: 1; transform: scale(1) rotate(0); } }
 @keyframes light-flicker { 0%, 100% { opacity: .72; transform: scale(.86); } 45% { opacity: 1; transform: scale(1.16); } 71% { opacity: .88; transform: scale(.96); } }
 @keyframes topper-glow { 0%, 100% { opacity: .88; transform: scale(.97); } 50% { opacity: 1; transform: scale(1.04); } }
-@keyframes card-enter { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes page-enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes card-enter { from { opacity: 0; transform: translate3d(0, 12px, 0) scale(.99); } to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); } }
+@keyframes page-enter { from { opacity: 0; transform: translate3d(0, 12px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+@keyframes hero-enter { from { opacity: 0; transform: translate3d(0, 18px, 0) scale(.992); } to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); } }
+@keyframes digit-arrive { from { opacity: .25; transform: translate3d(0, 7px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+@keyframes soft-glow { 0%, 100% { opacity: .35; } 50% { opacity: .68; } }
 
-.app-main > * { animation: page-enter .38s cubic-bezier(.2, .7, .3, 1) both; }
+.app-main > * { animation: page-enter .52s cubic-bezier(.2, .7, .3, 1) both; }
+.countdown-hero { animation: hero-enter .7s cubic-bezier(.16, 1, .3, 1) both; }
+.countdown-hero::before { animation: soft-glow 4.5s ease-in-out infinite; }
+.countdown-value { display: inline-block; animation: digit-arrive .24s cubic-bezier(.2, .7, .3, 1) both; }
+.home-note-row { animation: page-enter .52s .12s cubic-bezier(.2, .7, .3, 1) both; }
+.navigation-link { transition-timing-function: cubic-bezier(.2, .7, .3, 1); }
+.button { transition-timing-function: cubic-bezier(.2, .7, .3, 1); }
+.game-play-surface { animation: card-enter .52s .08s cubic-bezier(.2, .7, .3, 1) both; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

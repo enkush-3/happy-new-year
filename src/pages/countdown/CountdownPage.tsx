@@ -38,7 +38,7 @@ export default function CountdownPage() {
         <div className="countdown-grid" aria-label={countdown.hasArrived ? "2027 он ирсэн" : "2027 он хүртэлх үлдсэн хугацаа"}>
           {countdownUnits.map(({ key, label }) => (
             <div className="countdown-unit" key={key}>
-              <span className="countdown-value" aria-live={key === "seconds" ? "off" : undefined}>
+              <span className="countdown-value" key={countdown[key]} aria-live={key === "seconds" ? "off" : undefined}>
                 {String(countdown[key]).padStart(2, "0")}
               </span>
               <span className="countdown-label">{label}</span>

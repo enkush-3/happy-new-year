@@ -5,7 +5,7 @@ import type { GameResult } from "./types";
 const results: GameResult[] = [
   { gameId: "gift-catcher", score: 120, giftsCaught: 12, hazardsHit: 1, elapsedMs: 30000 },
   { gameId: "snowflake-clicker", score: 45, hits: 45, elapsedMs: 30000 },
-  { gameId: "countdown-stopper", elapsedMs: 20_282, deviationMs: 12, score: 988 },
+  { gameId: "countdown-stopper", elapsedMs: 8_012, targetMs: 8_000, deviationMs: 12, score: 988 },
   { gameId: "sleigh-runner", distance: 830, giftsCaught: 8 },
   { gameId: "trivia", correctAnswers: 8, totalQuestions: 10, archetype: "Баярын мастер" },
 ];
@@ -50,6 +50,24 @@ describe("game result sharing", () => {
       details: expect.arrayContaining([expect.stringContaining("хугацаа хадгалагдаагүй")]),
     });
     expect(decodeGameResult(encodePayload({ ...oldResult, elapsedMs: 20_300 }), "countdown-stopper")).toBeNull();
+  });
+
+  it("includes dynamic targets in shared stopper summaries and rejects inconsistent targets", () => {
+    const result = { gameId: "countdown-stopper" as const, elapsedMs: 8_125, targetMs: 8_000, deviationMs: 125, score: 875 };
+    expect(presentGameResult(decodeGameResult(encodeGameResult(result), "countdown-stopper")!)).toMatchObject({
+      details: expect.arrayContaining(["Хэмжсэн хугацаа: 8.125 сек", "Зорилтот хугацаа: 8.000 сек"]),
+    });
+    expect(decodeGameResult(encodePayload({ ...result, targetMs: 4_999 }), "countdown-stopper")).toBeNull();
+    expect(decodeGameResult(encodePayload({ ...result, deviationMs: 124, score: 876 }), "countdown-stopper")).toBeNull();
+  });
+
+  it("keeps the fixed target when presenting elapsed legacy stopper links", () => {
+    const oldElapsedResult = { gameId: "countdown-stopper", elapsedMs: 20_282, deviationMs: 12, score: 988 };
+    const decoded = decodeGameResult(encodePayload(oldElapsedResult), "countdown-stopper");
+    expect(decoded).toEqual(oldElapsedResult);
+    expect(presentGameResult(decoded!)).toMatchObject({
+      details: expect.arrayContaining(["Зорилтот хугацаа: 20.270 сек"]),
+    });
   });
 
   it("does not decode retired Fortune Cookie results", () => {

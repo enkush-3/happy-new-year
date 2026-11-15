@@ -155,6 +155,18 @@ describe("Happy New Year tree builder", () => {
     expect(await screen.findByText(/3D дүрслэл боломжгүй/i)).toBeInTheDocument();
   });
 
+  it("makes the 3D view mode switch between orbiting and editing", async () => {
+    const user = userEvent.setup();
+    render(<TreeGame />);
+
+    const orbitButton = screen.getByRole("button", { name: "Модны өнцгийг өөрчлөх" });
+    await user.click(orbitButton);
+    expect(screen.getByRole("button", { name: "Засварлах горимд буцах" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByRole("button", { name: "Засварлах горимд буцах" }));
+    expect(screen.getByRole("button", { name: "Модны өнцгийг өөрчлөх" })).toHaveAttribute("aria-pressed", "false");
+  });
+
   it("does not place another ornament when tapping a placed ornament", async () => {
     const user = userEvent.setup();
     render(<TreeGame />);

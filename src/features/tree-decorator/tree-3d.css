@@ -1,11 +1,24 @@
 .tree-3d-shell { position: absolute; z-index: 1; inset: 0; overflow: hidden; outline: none; }
 .tree-3d-shell:focus-visible { box-shadow: inset 0 0 0 3px rgba(255, 222, 151, .78); }
-.tree-3d-shell.is-orbiting { cursor: grab; touch-action: none; }
+.tree-3d-shell.is-orbiting { cursor: grab; touch-action: pan-y; }
 .tree-3d-shell.is-orbiting:active { cursor: grabbing; }
 .tree-3d-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.tree-3d-shell.is-orbiting .tree-3d-canvas { touch-action: pan-y; }
 .tree-3d-fallback { position: absolute; inset: 0; display: grid; place-items: center; }
 .tree-3d-status { position: absolute; z-index: 4; right: 12px; bottom: 12px; left: 12px; margin: 0; padding: 9px 13px; border: 1px solid rgba(230, 239, 255, .2); border-radius: 999px; color: #f8f2e6; background: rgba(11, 19, 32, .82); font-size: 12px; line-height: 1.4; text-align: center; pointer-events: none; }
-.tree-3d-instructions { position: absolute; right: 14px; bottom: 14px; left: 14px; padding: 8px 12px; border-radius: 999px; color: #f7f0e2; background: rgba(11, 19, 32, .56); font-size: 11px; text-align: center; pointer-events: none; }
+.tree-3d-instructions { position: absolute; right: 14px; bottom: 14px; left: 14px; max-width: 520px; margin: 0 auto; padding: 8px 12px; border-radius: 999px; color: #f7f0e2; background: rgba(11, 19, 32, .72); font-size: 11px; text-align: center; pointer-events: none; }
+.tree-3d-view-controls { position: absolute; z-index: 3; top: 12px; right: 12px; display: grid; grid-template-columns: repeat(3, 44px); gap: 5px; padding: 6px; border: 1px solid rgba(235, 241, 250, .18); border-radius: 17px; background: rgba(11, 19, 32, .72); box-shadow: 0 8px 20px rgba(2, 8, 18, .22); }
+.tree-3d-view-controls button { width: 44px; height: 44px; border: 1px solid rgba(235, 241, 250, .13); border-radius: 13px; color: #f8f2e6; background: rgba(255, 255, 255, .07); font: inherit; font-size: 17px; cursor: pointer; transition: color .2s ease, background .2s ease, transform .2s ease; }
+.tree-3d-view-controls button:hover { color: #141a28; background: #f4c96b; transform: translateY(-1px); }
+.tree-3d-view-controls button:active { transform: scale(.95); }
+.tree-3d-view-controls button:focus-visible { outline: 2px solid #f4c96b; outline-offset: 2px; }
+.tree-3d-view-controls button:nth-child(1) { grid-column: 1; grid-row: 1; }
+.tree-3d-view-controls button:nth-child(2) { grid-column: 2; grid-row: 1; }
+.tree-3d-view-controls button:nth-child(3) { grid-column: 3; grid-row: 1; }
+.tree-3d-view-controls button:nth-child(4) { grid-column: 3; grid-row: 2; }
+.tree-3d-view-controls button:nth-child(5) { grid-column: 2; grid-row: 2; }
+.tree-3d-view-controls button:nth-child(6) { grid-column: 2; grid-row: 3; }
+.tree-3d-view-controls button:nth-child(7) { grid-column: 1; grid-row: 2; }
 .tree-view-switch { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
 .tree-view-switch .tool-chip { flex: 1; }
 .tree-editor-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 13px; }
@@ -19,6 +32,13 @@
 @media (max-width: 640px) {
   .tree-editor-controls { grid-template-columns: 1fr 1fr; }
   .tree-3d-status { font-size: 11px; }
+  .tree-3d-view-controls { top: 9px; right: 9px; grid-template-columns: repeat(2, 44px); gap: 4px; padding: 5px; }
+  .tree-3d-view-controls button { width: 44px; height: 44px; border-radius: 11px; }
+  .tree-3d-view-controls button:nth-child(3) { grid-column: 1; grid-row: 2; }
+  .tree-3d-view-controls button:nth-child(4) { grid-column: 2; grid-row: 3; }
+  .tree-3d-view-controls button:nth-child(5) { grid-column: 1 / -1; grid-row: 4; width: auto; }
+  .tree-3d-view-controls button:nth-child(6) { grid-column: 2; grid-row: 2; }
+  .tree-3d-view-controls button:nth-child(7) { grid-column: 1; grid-row: 3; }
 }
 @media (prefers-reduced-motion: reduce) {
   .tree-3d-shell, .tree-3d-shell * { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
