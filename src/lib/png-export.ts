@@ -15,7 +15,7 @@ export function serializeTreeSvg(svg: SVGSVGElement): Blob {
   background.setAttribute("y", "0");
   background.setAttribute("width", "400");
   background.setAttribute("height", "560");
-  background.setAttribute("fill", "#10221c");
+  background.setAttribute("fill", "#10192d");
   const firstArtNode = clone.children.item(1);
   clone.insertBefore(background, firstArtNode ?? null);
 

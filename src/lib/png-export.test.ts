@@ -20,7 +20,7 @@ describe("tree image export", () => {
     expect(blob.type).toContain("image/svg+xml");
     expect(content).toContain('width="1200"');
     expect(content).toContain('height="1680"');
-    expect(content).toContain("#10221c");
+    expect(content).toContain("#10192d");
     expect(content).toContain("M200 0 400 560H0z");
   });
 

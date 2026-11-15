@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
-import { encodeTreeFragment } from "./lib/tree-state";
+import { decodeTreeFragment, DEFAULT_TREE_DESIGN, encodeTreeFragment } from "./lib/tree-state";
 import type { TreeDesign } from "./lib/tree-state";
 import { downloadTreePng } from "./lib/png-export";
 
@@ -85,15 +85,145 @@ describe("Happy New Year tree builder", () => {
     expect(ball.getAttribute("transform")).not.toBe(originalPosition);
   });
 
+  it("lets the player draw, share, and undo a custom tree stroke", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "Өөрөө модоо зурах" }));
+    const tree = screen.getByRole("group", { name: "Өөрөө зурж бүтээх мод" });
+    vi.spyOn(tree, "getBoundingClientRect").mockReturnValue({
+      x: 0, y: 0, left: 0, top: 0, right: 400, bottom: 560, width: 400, height: 560,
+      toJSON: () => ({}),
+    } as DOMRect);
+
+    fireEvent.pointerDown(tree, { pointerId: 7, button: 0, clientX: 120, clientY: 180 });
+    fireEvent.pointerMove(tree, { pointerId: 7, clientX: 170, clientY: 240 });
+    fireEvent.pointerUp(tree, { pointerId: 7, clientX: 210, clientY: 300 });
+
+    expect(screen.getByTestId("tree-stroke")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Линк хуулах" }));
+    const shareInput = screen.getByLabelText("Модны share линк") as HTMLInputElement;
+    const sharedDesign = decodeTreeFragment(new URL(shareInput.value).hash);
+    expect(sharedDesign.design.treeMode).toBe("custom");
+    expect(sharedDesign.design.strokes).toHaveLength(1);
+
+    await user.click(screen.getByRole("button", { name: "Баллуур" }));
+    fireEvent.pointerDown(tree, { pointerId: 8, button: 0, clientX: 170, clientY: 240 });
+    fireEvent.pointerUp(tree, { pointerId: 8, clientX: 170, clientY: 240 });
+    expect(screen.queryByTestId("tree-stroke")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Сүүлчийн зурсан зураасыг буцаах" }));
+    expect(screen.getByTestId("tree-stroke")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Сүүлчийн зурсан зураасыг буцаах" }));
+    expect(screen.queryByTestId("tree-stroke")).not.toBeInTheDocument();
+  });
+
+  it("keeps the middle of a long custom stroke when saving it", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "Өөрөө модоо зурах" }));
+    const tree = screen.getByRole("group", { name: "Өөрөө зурж бүтээх мод" });
+    vi.spyOn(tree, "getBoundingClientRect").mockReturnValue({
+      x: 0, y: 0, left: 0, top: 0, right: 400, bottom: 560, width: 400, height: 560,
+      toJSON: () => ({}),
+    } as DOMRect);
+
+    fireEvent.pointerDown(tree, { pointerId: 17, button: 0, clientX: 60, clientY: 120 });
+    for (let index = 0; index < 120; index += 1) {
+      fireEvent.pointerMove(tree, {
+        pointerId: 17,
+        clientX: 60 + (index % 10) * 25,
+        clientY: 120 + Math.floor(index / 10) * 22,
+      });
+    }
+    fireEvent.pointerUp(tree, { pointerId: 17, clientX: 285, clientY: 362 });
+
+    expect(screen.getByTestId("tree-stroke").getAttribute("d")).toContain("60 340");
+
+    await user.click(screen.getByRole("button", { name: "Бэлэн гацуур" }));
+    expect(screen.queryByTestId("tree-stroke")).not.toBeInTheDocument();
+    expect(screen.getByTestId("classic-tree")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Өөрөө модоо зурах" }));
+    expect(screen.getByTestId("tree-stroke")).toBeInTheDocument();
+  });
+
+  it("lets drawing start over a placed ornament", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "Өөрөө модоо зурах" }));
+    const tree = screen.getByRole("group", { name: "Өөрөө зурж бүтээх мод" });
+    vi.spyOn(tree, "getBoundingClientRect").mockReturnValue({
+      x: 0, y: 0, left: 0, top: 0, right: 400, bottom: 560, width: 400, height: 560,
+      toJSON: () => ({}),
+    } as DOMRect);
+    await user.click(screen.getByRole("button", { name: "Алтан од сонгох" }));
+    fireEvent.click(tree, { clientX: 200, clientY: 280 });
+    const star = screen.getByRole("button", { name: "Модон дээрх Алтан од" });
+    await user.click(screen.getByRole("button", { name: "Сойз" }));
+
+    fireEvent.pointerDown(star, { pointerId: 23, button: 0, clientX: 200, clientY: 280 });
+    fireEvent.pointerMove(tree, { pointerId: 23, clientX: 250, clientY: 330 });
+    fireEvent.pointerUp(tree, { pointerId: 23, clientX: 250, clientY: 330 });
+
+    expect(screen.getByTestId("tree-stroke")).toBeInTheDocument();
+  });
+
+  it("supports keyboard drawing and erasing on a custom tree", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "Өөрөө модоо зурах" }));
+    const tree = screen.getByRole("group", { name: "Өөрөө зурж бүтээх мод" });
+    tree.focus();
+    fireEvent.keyDown(tree, { key: "Enter" });
+    fireEvent.keyDown(tree, { key: "ArrowDown" });
+    fireEvent.keyDown(tree, { key: "ArrowRight" });
+    fireEvent.keyDown(tree, { key: "Enter" });
+
+    expect(screen.getByTestId("tree-stroke")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Баллуур" }));
+    tree.focus();
+    fireEvent.keyDown(tree, { key: "Delete" });
+    expect(screen.queryByTestId("tree-stroke")).not.toBeInTheDocument();
+  });
+
+  it("keeps tree-light colors in the SVG so PNG export retains them", () => {
+    render(<App />);
+    const svg = screen.getByRole("group", { name: "Чимэглэх гацуур" });
+    const lights = svg.querySelectorAll(".tree-light");
+
+    expect(lights.length).toBeGreaterThan(0);
+    expect(lights[0]).toHaveAttribute("fill", "#ffe3a1");
+    expect(lights[3]).toHaveAttribute("fill", "#c1e6ef");
+  });
+
   it("restores a shared tree from the URL fragment", () => {
     const design: TreeDesign = {
-      version: 1,
+      ...DEFAULT_TREE_DESIGN,
       decorations: [{ id: "shared-star", kind: "star", x: 0.5, y: 0.3 }],
     };
     window.history.replaceState(null, "", `/${encodeTreeFragment(design)}`);
     render(<App />);
 
     expect(screen.getByRole("button", { name: "Модон дээрх Алтан од" })).toBeInTheDocument();
+  });
+
+  it("restores a custom hand-drawn tree from the URL fragment", () => {
+    const design: TreeDesign = {
+      ...DEFAULT_TREE_DESIGN,
+      treeMode: "custom",
+      strokes: [{
+        id: "shared-stroke",
+        color: "ice",
+        width: 8,
+        points: [{ x: 0.5, y: 0.1 }, { x: 0.25, y: 0.8 }, { x: 0.75, y: 0.8 }],
+      }],
+    };
+    window.history.replaceState(null, "", `/${encodeTreeFragment(design)}`);
+    render(<App />);
+
+    expect(screen.getByRole("group", { name: "Өөрөө зурж бүтээх мод" })).toBeInTheDocument();
+    expect(screen.getByTestId("tree-stroke")).toHaveAttribute("stroke", "#98d8f2");
+    expect(screen.getByRole("button", { name: "Баллуур" })).toBeInTheDocument();
   });
 
   it("shows a manual-copy fallback when clipboard access is unavailable", async () => {

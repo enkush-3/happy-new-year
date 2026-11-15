@@ -1,15 +1,20 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import TreeScene, { clampToTree, treePointFromClient } from "./components/TreeScene";
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import TreeScene, { clampToTree, treeCanvasPointFromClient, treePointFromClient, type TreeTool } from "./components/TreeScene";
 import {
   addDecoration,
+  addStroke,
   decodeTreeFragment,
   DEFAULT_TREE_DESIGN,
   encodeTreeFragment,
   MAX_DECORATIONS,
   moveDecoration,
   removeDecoration,
+  removeStroke,
   type OrnamentKind,
   type TreeDesign,
+  type TreePenColor,
+  type TreePenWidth,
+  type TreeStroke,
 } from "./lib/tree-state";
 import { downloadTreePng } from "./lib/png-export";
 import "./styles.css";
@@ -22,11 +27,25 @@ const palette: { kind: OrnamentKind; label: string; icon: string; color: string 
   { kind: "star", label: "Алтан од", icon: "✦", color: "#ffd978" },
 ];
 
+const drawingColors: { color: TreePenColor; label: string; value: string }[] = [
+  { color: "snow", label: "Цасан цагаан", value: "#f7f4ee" },
+  { color: "gold", label: "Алтан шар", value: "#f4c96b" },
+  { color: "berry", label: "Жимсний улаан", value: "#d76b75" },
+  { color: "ice", label: "Мөсөн цэнхэр", value: "#98d8f2" },
+];
+const drawingWidths: TreePenWidth[] = [5, 8, 12];
+const snowflakeCount = 32;
+const stageSnowflakeCount = 18;
+
 export default function App() {
   const [initialShare] = useState(() => decodeTreeFragment(window.location.hash));
   const [design, setDesign] = useState<TreeDesign>(initialShare.design);
   const [selectedKind, setSelectedKind] = useState<OrnamentKind | null>(null);
   const [selectedDecorationId, setSelectedDecorationId] = useState<string | null>(null);
+  const [drawingTool, setDrawingTool] = useState<TreeTool>(initialShare.design.treeMode === "custom" ? "draw" : "decorate");
+  const [penColor, setPenColor] = useState<TreePenColor>("snow");
+  const [penWidth, setPenWidth] = useState<TreePenWidth>(8);
+  const [strokeHistory, setStrokeHistory] = useState<TreeStroke[][]>([]);
   const [notice, setNotice] = useState(
     initialShare.valid ? "" : "Хуваалцсан модны линк буруу байна. Шинэ модноос эхэллээ.",
   );
@@ -58,7 +77,9 @@ export default function App() {
         return;
       }
 
-      const point = treePointFromClient(svg, event.clientX, event.clientY);
+      const point = design.treeMode === "custom"
+        ? treeCanvasPointFromClient(svg, event.clientX, event.clientY)
+        : treePointFromClient(svg, event.clientX, event.clientY);
       placeDecoration(drag.kind, point.x, point.y);
       suppressTreeClick.current = true;
       window.setTimeout(() => {
@@ -95,7 +116,7 @@ export default function App() {
       return;
     }
 
-    const point = clampToTree(x, y);
+    const point = design.treeMode === "custom" ? clampToCanvas(x, y) : clampToTree(x, y);
     const id = createId();
     const nextDesign = addDecoration(design, { id, kind, ...point });
     setDesign(nextDesign);
@@ -112,6 +133,7 @@ export default function App() {
   }
 
   function handleTreePlace(x: number, y: number) {
+    if (drawingTool !== "decorate") return;
     if (suppressTreeClick.current) {
       suppressTreeClick.current = false;
       return;
@@ -124,6 +146,7 @@ export default function App() {
     event.preventDefault();
     setSelectedKind(kind);
     setSelectedDecorationId(null);
+    setDrawingTool("decorate");
     paletteDrag.current = {
       kind,
       pointerId: event.pointerId,
@@ -133,8 +156,53 @@ export default function App() {
   }
 
   function handleMove(id: string, x: number, y: number) {
-    const point = clampToTree(x, y);
+    const point = design.treeMode === "custom" ? clampToCanvas(x, y) : clampToTree(x, y);
     setDesign((current) => moveDecoration(current, id, point.x, point.y));
+  }
+
+  function chooseTreeMode(treeMode: TreeDesign["treeMode"]) {
+    setDesign((current) => ({ ...current, treeMode }));
+    setDrawingTool(treeMode === "custom" ? "draw" : "decorate");
+    setSelectedKind(null);
+    setSelectedDecorationId(null);
+    setNotice(treeMode === "custom" ? "Сойзоор модоо зурна уу." : "Бэлэн гацуураа чимэглээрэй.");
+  }
+
+  function rememberStrokes() {
+    setStrokeHistory((history) => [...history.slice(-19), design.strokes]);
+  }
+
+  function handleDraw(stroke: TreeStroke) {
+    const nextDesign = addStroke(design, stroke);
+    if (nextDesign === design) {
+      setNotice("Зураасны хязгаарт хүрлээ. Нэг зураас устгаад дахин оролдоно уу.");
+      return;
+    }
+    rememberStrokes();
+    setDesign(nextDesign);
+  }
+
+  function handleEraseStroke(id: string) {
+    const nextDesign = removeStroke(design, id);
+    if (nextDesign === design) return;
+    rememberStrokes();
+    setDesign(nextDesign);
+    setNotice("Зураасыг баллуурдлаа. Хүсвэл буцааж болно.");
+  }
+
+  function undoDrawing() {
+    const previousStrokes = strokeHistory[strokeHistory.length - 1];
+    if (!previousStrokes) return;
+    setDesign((current) => ({ ...current, strokes: previousStrokes }));
+    setStrokeHistory((history) => history.slice(0, -1));
+    setNotice("Сүүлчийн зургийг буцаалаа.");
+  }
+
+  function clearDrawing() {
+    if (!design.strokes.length) return;
+    rememberStrokes();
+    setDesign((current) => ({ ...current, strokes: [] }));
+    setNotice("Өөрийн зурсан зурааснуудыг арилгалаа.");
   }
 
   function handleRemove(id: string) {
@@ -145,8 +213,10 @@ export default function App() {
 
   function resetTree() {
     setDesign(DEFAULT_TREE_DESIGN);
+    setStrokeHistory([]);
     setSelectedKind(null);
     setSelectedDecorationId(null);
+    setDrawingTool("decorate");
     setShareLink("");
     setShowShareLink(false);
     setNotice("Модоо шинээр эхлүүллээ.");
@@ -213,10 +283,68 @@ export default function App() {
     }
   }
 
+  const drawingPanel = design.treeMode === "custom" ? (
+    <section className="tool-card drawing-card" aria-labelledby="drawing-title">
+      <div className="section-title-row">
+        <div className="section-icon section-icon--blue" aria-hidden="true">✎</div>
+        <div>
+          <h2 id="drawing-title">Өөрийн гацуурыг зур</h2>
+          <p>Зурган дээрээ хуруу эсвэл хулганаар чирнэ үү</p>
+        </div>
+      </div>
+      <div className="drawing-tools" role="group" aria-label="Зургийн хэрэгсэл">
+        <button className={`tool-chip${drawingTool === "draw" ? " is-active" : ""}`} type="button" aria-pressed={drawingTool === "draw"} onClick={() => setDrawingTool("draw")}>Сойз</button>
+        <button className={`tool-chip${drawingTool === "erase" ? " is-active" : ""}`} type="button" aria-pressed={drawingTool === "erase"} onClick={() => setDrawingTool("erase")}>Баллуур</button>
+        <button className={`tool-chip${drawingTool === "decorate" ? " is-active" : ""}`} type="button" aria-pressed={drawingTool === "decorate"} onClick={() => setDrawingTool("decorate")}>Чимэглэх</button>
+      </div>
+      <div className="draw-color-palette" role="group" aria-label="Зурах өнгө">
+        {drawingColors.map((item) => (
+          <button
+            key={item.color}
+            type="button"
+            className={`draw-color${penColor === item.color ? " is-active" : ""}`}
+            style={{ "--swatch": item.value } as CSSProperties}
+            aria-label={item.label}
+            aria-pressed={penColor === item.color}
+            onClick={() => { setPenColor(item.color); setDrawingTool("draw"); }}
+          />
+        ))}
+      </div>
+      <div className="draw-widths" role="group" aria-label="Сойзны хэмжээ">
+        {drawingWidths.map((width, index) => (
+          <button
+            key={width}
+            type="button"
+            className={`width-button${penWidth === width ? " is-active" : ""}`}
+            aria-label={`${["Нарийн", "Дунд", "Өргөн"][index]} сойз`}
+            aria-pressed={penWidth === width}
+            onClick={() => { setPenWidth(width); setDrawingTool("draw"); }}
+          ><span style={{ width: `${4 + index * 3}px`, height: `${4 + index * 3}px` }} /></button>
+        ))}
+      </div>
+      <div className="edit-buttons drawing-actions">
+        <button className="button button--quiet" type="button" onClick={undoDrawing} disabled={!strokeHistory.length} aria-label="Сүүлчийн зурсан зураасыг буцаах">Буцаах</button>
+        <button className="button button--quiet" type="button" onClick={clearDrawing} disabled={!design.strokes.length}>Бүгдийг арилгах</button>
+      </div>
+      <p className="tool-hint"><span aria-hidden="true">✦</span> Өнгөө сонгоод модны мөчир, хэлбэрээ зурж болно.</p>
+    </section>
+  ) : null;
+
   return (
     <main className="page-shell">
       <div className="snowfall" aria-hidden="true">
-        <span>✦</span><span>·</span><span>✧</span><span>·</span><span>✦</span><span>·</span><span>✧</span>
+        {Array.from({ length: snowflakeCount }, (_, index) => (
+          <i
+            key={index}
+            style={{
+              left: `${(index * 37 + 8) % 100}%`,
+              animationDuration: `${12 + (index * 7) % 17}s`,
+              animationDelay: `${-((index * 11) % 25)}s`,
+              fontSize: `${5 + (index % 5) * 2}px`,
+              opacity: 0.36 + (index % 4) * 0.12,
+            } as CSSProperties}
+          />
+        ))}
       </div>
 
       <header className="site-header">
@@ -245,6 +373,27 @@ export default function App() {
             </span>
           </div>
 
+          <div className="tree-mode-switch" role="group" aria-label="Модны загвараа сонгох">
+            <button
+              type="button"
+              className={`mode-button${design.treeMode === "classic" ? " is-active" : ""}`}
+              aria-pressed={design.treeMode === "classic"}
+              onClick={() => chooseTreeMode("classic")}
+            >
+              <span aria-hidden="true">♧</span> Бэлэн гацуур
+            </button>
+            <button
+              type="button"
+              className={`mode-button${design.treeMode === "custom" ? " is-active" : ""}`}
+              aria-pressed={design.treeMode === "custom"}
+              onClick={() => chooseTreeMode("custom")}
+            >
+              <span aria-hidden="true">✎</span> Өөрөө модоо зурах
+            </button>
+          </div>
+
+          {drawingPanel}
+
           <div className="tree-stage">
             <div className="stage-glow" aria-hidden="true" />
             <div className="stage-snow stage-snow--one" aria-hidden="true" />
@@ -253,17 +402,41 @@ export default function App() {
             <TreeScene
               design={design}
               selectedDecorationId={selectedDecorationId}
+              drawingTool={drawingTool}
+              penColor={penColor}
+              penWidth={penWidth}
               svgRef={treeRef}
               onPlace={handleTreePlace}
               onMove={handleMove}
               onSelect={setSelectedDecorationId}
               onRemove={handleRemove}
+              onDraw={handleDraw}
+              onErase={handleEraseStroke}
             />
+            <div className="stage-fall" aria-hidden="true">
+              {Array.from({ length: stageSnowflakeCount }, (_, index) => (
+                <i
+                  key={index}
+                  style={{
+                    left: `${(index * 43 + 4) % 100}%`,
+                    animationDuration: `${5 + (index * 3) % 8}s`,
+                    animationDelay: `${-((index * 5) % 11)}s`,
+                    width: `${2 + index % 3}px`,
+                    height: `${2 + index % 3}px`,
+                    opacity: 0.45 + (index % 4) * 0.12,
+                  }}
+                />
+              ))}
+            </div>
             <div className="stage-caption" aria-hidden="true"><span /> ОДОО ТАНЫ ЭЭЛЖ</div>
           </div>
 
           <p className="live-notice" role="status" aria-live="polite">
-            {notice || (selectedKind ? `${selectedLabel} сонгогдлоо — модон дээр товшино уу.` : "Чимэглэл сонгоод модон дээр байрлуулаарай.")}
+            {notice || (selectedKind
+              ? `${selectedLabel} сонгогдлоо — модон дээр товшино уу.`
+              : design.treeMode === "custom"
+                ? drawingTool === "decorate" ? "Чимэглэл сонгоод өөрийн зурсан модон дээр байрлуулаарай." : "Сойзоо чирж өөрийн гацуурыг зурна уу."
+                : "Чимэглэл сонгоод модон дээр байрлуулаарай.")}
           </p>
         </div>
 
@@ -293,6 +466,7 @@ export default function App() {
                   onClick={() => {
                     setSelectedKind(item.kind);
                     setSelectedDecorationId(null);
+                    setDrawingTool("decorate");
                     setNotice(`${item.label} сонгогдлоо — модон дээр товшино уу.`);
                   }}
                 >
@@ -373,4 +547,11 @@ export default function App() {
 function createId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return `ornament-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+function clampToCanvas(x: number, y: number) {
+  return {
+    x: Math.min(0.975, Math.max(0.025, x)),
+    y: Math.min(0.92, Math.max(0.03, y)),
+  };
 }
