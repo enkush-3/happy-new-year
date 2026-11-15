@@ -48,7 +48,7 @@ describe("tree image export", () => {
     vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
     vi.spyOn(window, "setTimeout").mockImplementation((callback) => {
       if (typeof callback === "function") callback();
-      return 1;
+      return 1 as unknown as ReturnType<typeof window.setTimeout>;
     });
     vi.stubGlobal("Image", class {
       onload: (() => void) | null = null;
@@ -71,7 +71,8 @@ describe("tree image export", () => {
   it("contains the current 3D render canvas on a dark PNG background", async () => {
     const drawImage = vi.fn();
     const fillRect = vi.fn();
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage, fillRect } as unknown as CanvasRenderingContext2D);
+    const fillText = vi.fn();
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage, fillRect, fillText } as unknown as CanvasRenderingContext2D);
     vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) => {
       callback(new Blob(["png"], { type: "image/png" }));
     });
@@ -80,7 +81,7 @@ describe("tree image export", () => {
     vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
     vi.spyOn(window, "setTimeout").mockImplementation((callback) => {
       if (typeof callback === "function") callback();
-      return 1;
+      return 1 as unknown as ReturnType<typeof window.setTimeout>;
     });
     const renderCanvas = document.createElement("canvas");
 
@@ -88,6 +89,10 @@ describe("tree image export", () => {
 
     expect(fillRect).toHaveBeenCalledWith(0, 0, 1200, 1680);
     expect(drawImage).toHaveBeenCalledWith(renderCanvas, 0, 540, 1200, 600);
+    expect(fillText).toHaveBeenNthCalledWith(1, expect.stringContaining("RoboHoloclone12"), 600, 1570);
+    expect(fillText).toHaveBeenNthCalledWith(2, expect.stringContaining("https://sketchfab.com/3d-models/christmas-tree-"), 600, 1601);
+    expect(fillText).toHaveBeenNthCalledWith(3, expect.stringContaining("Өөрчлөлт"), 600, 1632);
+    expect(fillText).toHaveBeenNthCalledWith(4, expect.stringContaining("https://creativecommons.org/licenses/by/4.0/"), 600, 1663);
   });
 
   it("contains a wide 3D canvas with dark padding instead of stretching it", async () => {
@@ -102,7 +107,7 @@ describe("tree image export", () => {
     vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
     vi.spyOn(window, "setTimeout").mockImplementation((callback) => {
       if (typeof callback === "function") callback();
-      return 1;
+      return 1 as unknown as ReturnType<typeof window.setTimeout>;
     });
     const renderCanvas = document.createElement("canvas");
     renderCanvas.width = 1600;

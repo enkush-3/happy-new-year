@@ -5,7 +5,6 @@
 .countdown-stopper__dial strong { color: var(--mini-on-surface); font-variant-numeric: tabular-nums; font-size: clamp(56px, 12vw, 88px); font-weight: 550; letter-spacing: -.06em; line-height: 1; }
 .countdown-stopper__unit { color: var(--mini-muted); font-size: 12px; }
 .countdown-stopper__track { width: min(100%, 250px); height: 5px; margin-top: 11px; overflow: hidden; border-radius: 999px; background: rgba(196, 210, 232, .15); }
-.countdown-stopper__track span { display: block; width: 100%; height: 100%; transform-origin: left center; border-radius: inherit; background: var(--mini-primary); transition: transform .04s linear; }
 .countdown-stopper__dial.is-running strong { text-shadow: 0 0 34px rgba(232, 198, 125, .25); }
 .countdown-stopper__action { display: flex; justify-content: center; }
 .countdown-stopper__stop { min-width: 190px; min-height: 64px; background: var(--md-sys-color-tertiary, #cf7781); color: #28151a; font-size: 18px; }

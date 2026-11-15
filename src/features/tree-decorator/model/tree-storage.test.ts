@@ -17,7 +17,7 @@ const makeStorage = (initial: string | null = null): Storage => {
 describe("last tree storage", () => {
   it("saves and restores the most recent tree design", () => {
     const storage = makeStorage();
-    const design: TreeDesign = { ...DEFAULT_TREE_DESIGN, treeMode: "custom" };
+    const design: TreeDesign = { ...DEFAULT_TREE_DESIGN, lights: { ...DEFAULT_TREE_DESIGN.lights, twinkle: false } };
 
     saveLastTreeDesign(design, storage);
 

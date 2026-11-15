@@ -47,6 +47,17 @@ export async function downloadTreePng(source: SVGSVGElement | HTMLCanvasElement 
       const fitted = containCanvas(renderCanvas.width, renderCanvas.height);
       context.drawImage(renderCanvas, fitted.x, fitted.y, fitted.width, fitted.height);
     }
+    if (typeof context.fillText === "function") {
+      context.fillStyle = "rgba(10, 16, 29, 0.88)";
+      context.fillRect(0, 1540, exportWidth, 140);
+      context.fillStyle = "#c8d2df";
+      context.font = "16px system-ui, sans-serif";
+      context.textAlign = "center";
+      context.fillText("Загвар: Christmas Tree · RoboHoloclone12", exportWidth / 2, 1570);
+      context.fillText("Эх сурвалж: https://sketchfab.com/3d-models/christmas-tree-742b8a73f28c4749a51d756332809375", exportWidth / 2, 1601);
+      context.fillText("Өөрчлөлт: glTF болгон хөрвүүлж, web-д зориулан polygon багасгасан", exportWidth / 2, 1632);
+      context.fillText("CC BY 4.0 · https://creativecommons.org/licenses/by/4.0/", exportWidth / 2, 1663);
+    }
 
     const png = await canvasToBlob(canvas);
     const pngUrl = URL.createObjectURL(png);

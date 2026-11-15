@@ -29,6 +29,7 @@ describe("CountdownStopperGame", () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
     const onComplete = vi.fn();
     render(<CountdownStopperGame onComplete={onComplete} />);
+    expect(document.querySelector(".countdown-stopper__track")?.children).toHaveLength(0);
     expect(screen.getByText("Зорилт").parentElement).toHaveTextContent("5.000 сек");
     fireEvent.click(screen.getByRole("button", { name: "Тоглож эхлэх" }));
     expect(screen.getByTestId("stopper-display")).toHaveTextContent("0.00");

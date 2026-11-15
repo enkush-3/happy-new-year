@@ -31,3 +31,5 @@ jobs:
         run: npm test -- --run
       - name: Build site
         run: npm run build
+      - name: Check optimized 3D model budget
+        run: npm run assets:check

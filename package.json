@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "vitest"
+    "test": "vitest",
+    "assets:tree:prepare": "node scripts/prepare-tree-model.cjs",
+    "assets:check": "node scripts/check-tree-asset.mjs"
   },
   "dependencies": {
     "react": "^19.3.1",
@@ -23,6 +25,7 @@
     "@types/react-dom": "^19.3.0",
     "@types/three": "^0.187.0",
     "@vitejs/plugin-react": "^6.3.0",
+    "fbx2gltf": "^0.9.7-p1",
     "jsdom": "^31.0.1",
     "typescript": "^5.9.3",
     "vite": "^8.3.8",

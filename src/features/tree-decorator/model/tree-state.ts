@@ -1,5 +1,4 @@
 export type OrnamentKind = "bauble-red" | "bauble-gold" | "bauble-green" | "candy-cane" | "star";
-export type TreeMode = "classic" | "custom";
 export type TreePenColor = "snow" | "gold" | "berry" | "ice";
 export type TreePenWidth = 5 | 8 | 12;
 export type OrnamentColor = "#d96b5e" | "#f2c96e" | "#a8c989" | "#f4e7ce" | "#ffd978" | "#98d8f2" | "#d58bea";
@@ -11,6 +10,8 @@ export interface TreeDecoration {
   y: number;
   /** Position around the tree, measured in turns (0–1). */
   angle: number;
+  /** Surface distance from the trunk, normalized to the widest tree branch. */
+  radius: number;
   /** Rotation around the ornament's center, in degrees. */
   rotation: number;
   /** Relative size. */
@@ -18,12 +19,12 @@ export interface TreeDecoration {
   color: OrnamentColor;
 }
 
-export interface TreePoint {
+interface TreePoint {
   x: number;
   y: number;
 }
 
-export interface TreeStroke {
+interface TreeStroke {
   id: string;
   color: TreePenColor;
   width: TreePenWidth;
@@ -31,22 +32,27 @@ export interface TreeStroke {
 }
 
 export interface TreeDesign {
-  version: 3;
-  treeMode: TreeMode;
+  version: 4;
   decorations: TreeDecoration[];
-  strokes: TreeStroke[];
+  lights: TreeLights;
+}
+
+export interface TreeLights {
+  enabled: boolean;
+  color: OrnamentColor;
+  brightness: number;
+  twinkle: boolean;
 }
 
 export const MAX_DECORATIONS = 48;
-export const MAX_DRAWING_STROKES = 16;
-export const MAX_DRAWING_POINTS = 320;
-export const MAX_POINTS_PER_STROKE = 80;
+const maxLegacyDrawingStrokes = 16;
+const maxLegacyDrawingPoints = 320;
+const maxLegacyPointsPerStroke = 80;
 export const TREE_PLACEMENT_BOUNDS = { minX: 0.16, maxX: 0.84, minY: 0.16, maxY: 0.82 } as const;
 export const DEFAULT_TREE_DESIGN: TreeDesign = {
-  version: 3,
-  treeMode: "classic",
+  version: 4,
   decorations: [],
-  strokes: [],
+  lights: { enabled: true, color: "#ffd978", brightness: 0.82, twinkle: true },
 };
 
 const ornamentKinds = new Set<OrnamentKind>([
@@ -81,7 +87,6 @@ const compactPenColor: Record<TreePenColor, string> = { snow: "w", gold: "g", be
 const expandedPenColor = new Map<string, TreePenColor>(
   Object.entries(compactPenColor).map(([color, code]) => [code, color as TreePenColor]),
 );
-const compactPenWidth: Record<TreePenWidth, number> = { 5: 0, 8: 1, 12: 2 };
 const expandedPenWidth = new Map<number, TreePenWidth>([[0, 5], [1, 8], [2, 12]]);
 const maxFragmentLength = 8192;
 
@@ -97,7 +102,7 @@ export function addDecoration(design: TreeDesign, decoration: TreeDecoration): T
   return { ...design, decorations: [...design.decorations, { ...decoration }] };
 }
 
-export function moveDecoration(design: TreeDesign, id: string, x: number, y: number, angle?: number): TreeDesign {
+export function moveDecoration(design: TreeDesign, id: string, x: number, y: number, angle?: number, radius?: number): TreeDesign {
   if (!Number.isFinite(x) || !Number.isFinite(y)) return design;
   const index = design.decorations.findIndex((decoration) => decoration.id === id);
   if (index < 0) return design;
@@ -108,6 +113,7 @@ export function moveDecoration(design: TreeDesign, id: string, x: number, y: num
     x: clamp(x, TREE_PLACEMENT_BOUNDS.minX, TREE_PLACEMENT_BOUNDS.maxX),
     y: clamp(y, TREE_PLACEMENT_BOUNDS.minY, TREE_PLACEMENT_BOUNDS.maxY),
     angle: angle === undefined ? legacyAngleForX(x) : normalizeAngle(angle),
+    radius: radius === undefined ? decorations[index].radius : clamp(radius, 0.02, 1),
   };
   return { ...design, decorations };
 }
@@ -135,6 +141,7 @@ export function duplicateDecoration(design: TreeDesign, id: string, newId: strin
     x: clamp(original.x + 0.035, TREE_PLACEMENT_BOUNDS.minX, TREE_PLACEMENT_BOUNDS.maxX),
     y: clamp(original.y + 0.025, TREE_PLACEMENT_BOUNDS.minY, TREE_PLACEMENT_BOUNDS.maxY),
     angle: normalizeAngle(original.angle + 0.035),
+    radius: original.radius,
   };
   return addDecoration(design, duplicated);
 }
@@ -144,30 +151,10 @@ export function removeDecoration(design: TreeDesign, id: string): TreeDesign {
   return decorations.length === design.decorations.length ? design : { ...design, decorations };
 }
 
-export function addStroke(design: TreeDesign, stroke: TreeStroke): TreeDesign {
-  const drawingPoints = countDrawingPoints(design.strokes);
-  if (
-    design.strokes.length >= MAX_DRAWING_STROKES ||
-    drawingPoints + stroke.points.length > MAX_DRAWING_POINTS ||
-    !isStroke(stroke) ||
-    design.strokes.some((existing) => existing.id === stroke.id)
-  ) {
-    return design;
-  }
-
-  return { ...design, strokes: [...design.strokes, copyStroke(stroke)] };
-}
-
-export function removeStroke(design: TreeDesign, id: string): TreeDesign {
-  const strokes = design.strokes.filter((stroke) => stroke.id !== id);
-  return strokes.length === design.strokes.length ? design : { ...design, strokes };
-}
-
 export function encodeTreeFragment(design: TreeDesign): string {
   if (!isTreeDesign(design)) throw new Error("Модны өгөгдөл буруу байна.");
   const json = JSON.stringify({
-    v: 3,
-    m: design.treeMode === "custom" ? "c" : "p",
+    v: 4,
     d: design.decorations.map((decoration) => [
       decoration.id,
       compactKindCode[decoration.kind],
@@ -177,13 +164,9 @@ export function encodeTreeFragment(design: TreeDesign): string {
       Math.round(decoration.rotation),
       Math.round(decoration.scale * 100),
       encodeColor(decoration.color),
+      Math.round(decoration.radius * 1000),
     ]),
-    s: design.strokes.map((stroke) => [
-      stroke.id,
-      compactPenColor[stroke.color],
-      compactPenWidth[stroke.width],
-      encodePoints(stroke.points),
-    ]),
+    l: [design.lights.enabled ? 1 : 0, encodeColor(design.lights.color), Math.round(design.lights.brightness * 100), design.lights.twinkle ? 1 : 0],
   });
   const encoded = toBase64Url(json);
   if (encoded.length + "#tree=".length > maxFragmentLength) {
@@ -193,7 +176,7 @@ export function encodeTreeFragment(design: TreeDesign): string {
   return `#tree=${encoded}`;
 }
 
-export function decodeTreeFragment(fragment: string): { design: TreeDesign; valid: boolean } {
+export function decodeTreeFragment(fragment: string): { design: TreeDesign; valid: boolean; discardedLegacyDrawing?: boolean } {
   const value = fragment.startsWith("#") ? fragment.slice(1) : fragment;
   if (!value || !value.startsWith("tree=")) return { design: DEFAULT_TREE_DESIGN, valid: true };
 
@@ -207,7 +190,10 @@ export function decodeTreeFragment(fragment: string): { design: TreeDesign; vali
     const payload: unknown = JSON.parse(json);
     const design = expandCompactDesign(payload);
     if (!design || !isTreeDesign(design)) return { design: DEFAULT_TREE_DESIGN, valid: false };
-    return { design, valid: true };
+    const compact = payload as { v?: unknown; m?: unknown; s?: unknown };
+    const discardedLegacyDrawing =
+      (compact.v === 2 || compact.v === 3) && compact.m === "c" && Array.isArray(compact.s) && compact.s.length > 0;
+    return { design, valid: true, ...(discardedLegacyDrawing ? { discardedLegacyDrawing: true } : {}) };
   } catch {
     return { design: DEFAULT_TREE_DESIGN, valid: false };
   }
@@ -215,17 +201,33 @@ export function decodeTreeFragment(fragment: string): { design: TreeDesign; vali
 
 function expandCompactDesign(value: unknown): TreeDesign | null {
   if (!value || typeof value !== "object") return null;
-  const payload = value as { v?: unknown; m?: unknown; d?: unknown; s?: unknown };
+  const payload = value as { v?: unknown; m?: unknown; d?: unknown; s?: unknown; l?: unknown };
   if (!Array.isArray(payload.d) || payload.d.length > MAX_DECORATIONS) return null;
 
   if (payload.v === 1) {
     const decorations = expandDecorations(payload.d);
     return decorations ? { ...DEFAULT_TREE_DESIGN, decorations } : null;
   }
+  if (payload.v === 4) {
+    if (!Array.isArray(payload.l) || payload.l.length !== 4) return null;
+    const [enabledCode, colorCode, brightness, twinkleCode] = payload.l as unknown[];
+    const color = typeof colorCode === "string" ? decodeColor(colorCode) : undefined;
+    if (
+      (enabledCode !== 0 && enabledCode !== 1) || !color || !isIntInRange(brightness, 0, 100) ||
+      (twinkleCode !== 0 && twinkleCode !== 1)
+    ) return null;
+    const decorations = expandDecorationsV4(payload.d);
+    if (!decorations) return null;
+    return {
+      ...DEFAULT_TREE_DESIGN,
+      decorations,
+      lights: { enabled: enabledCode === 1, color, brightness: brightness / 100, twinkle: twinkleCode === 1 },
+    };
+  }
   if ((payload.v !== 2 && payload.v !== 3) || (payload.m !== "c" && payload.m !== "p") || !Array.isArray(payload.s)) return null;
 
   const decorations = payload.v === 3 ? expandDecorationsV3(payload.d) : expandDecorations(payload.d);
-  if (!decorations || payload.s.length > MAX_DRAWING_STROKES) return null;
+  if (!decorations || payload.s.length > maxLegacyDrawingStrokes) return null;
 
   const strokes: TreeStroke[] = [];
   for (const entry of payload.s) {
@@ -234,13 +236,8 @@ function expandCompactDesign(value: unknown): TreeDesign | null {
     strokes.push(stroke);
   }
 
-  if (countDrawingPoints(strokes) > MAX_DRAWING_POINTS) return null;
-  return {
-    version: 3,
-    treeMode: payload.m === "c" ? "custom" : "classic",
-    decorations,
-    strokes,
-  };
+  if (countDrawingPoints(strokes) > maxLegacyDrawingPoints) return null;
+  return { ...DEFAULT_TREE_DESIGN, decorations };
 }
 
 function expandDecorations(value: unknown[]): TreeDecoration[] | null {
@@ -278,8 +275,27 @@ function expandDecorationsV3(value: unknown[]): TreeDecoration[] | null {
     ) return null;
     decorations.push({
       id, kind, x: x / 1000, y: y / 1000, angle: angle / 1000,
-      rotation, scale: scale / 100, color,
+      radius: legacyRadiusForY(y / 1000), rotation, scale: scale / 100, color,
     });
+  }
+  return decorations;
+}
+
+function expandDecorationsV4(value: unknown[]): TreeDecoration[] | null {
+  const decorations: TreeDecoration[] = [];
+  for (const entry of value) {
+    if (!Array.isArray(entry) || entry.length !== 9) return null;
+    const [id, code, x, y, angle, rotation, scale, colorCode, radius] = entry as unknown[];
+    const kind = typeof code === "string" ? expandedKindCode.get(code) : undefined;
+    const color = typeof colorCode === "string" ? decodeColor(colorCode) : undefined;
+    if (
+      typeof id !== "string" || !validId(id) || !kind || !color ||
+      !isIntInRange(x, 0, 1000) || !isIntInRange(y, 0, 1000) ||
+      !isIntInRange(angle, 0, 1000) || !isIntInRange(rotation, -180, 180) ||
+      !isIntInRange(scale, 60, 160) || !isIntInRange(radius, 20, 1000) ||
+      decorations.some((decoration) => decoration.id === id)
+    ) return null;
+    decorations.push({ id, kind, x: x / 1000, y: y / 1000, angle: angle / 1000, radius: radius / 1000, rotation, scale: scale / 100, color });
   }
   return decorations;
 }
@@ -297,27 +313,15 @@ function expandStroke(value: unknown): TreeStroke | null {
   return isStroke(stroke) ? stroke : null;
 }
 
-function encodePoints(points: TreePoint[]): string {
-  const bytes: number[] = [];
-  for (const point of points) {
-    for (const value of [point.x, point.y]) {
-      const coordinate = Math.round(value * 1000);
-      bytes.push((coordinate >> 8) & 0xff, coordinate & 0xff);
-    }
-  }
-  const binary = String.fromCharCode(...bytes);
-  return toBase64Url(binary);
-}
-
 function decodePoints(encoded: string): TreePoint[] | null {
-  const maxEncodedPointLength = Math.ceil((MAX_POINTS_PER_STROKE * 16) / 3) + 4;
+  const maxEncodedPointLength = Math.ceil((maxLegacyPointsPerStroke * 16) / 3) + 4;
   if (!encoded || encoded.length > maxEncodedPointLength || !/^[A-Za-z0-9_-]+$/u.test(encoded)) {
     return null;
   }
 
   try {
     const binary = fromBase64Url(encoded);
-    if (!binary.length || binary.length % 4 !== 0 || binary.length / 4 > MAX_POINTS_PER_STROKE) return null;
+    if (!binary.length || binary.length % 4 !== 0 || binary.length / 4 > maxLegacyPointsPerStroke) return null;
     const points: TreePoint[] = [];
     for (let index = 0; index < binary.length; index += 4) {
       const x = (binary.charCodeAt(index) << 8) | binary.charCodeAt(index + 1);
@@ -344,11 +348,9 @@ function isTreeDesign(value: unknown): value is TreeDesign {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<TreeDesign>;
   if (
-    candidate.version !== 3 ||
-    (candidate.treeMode !== "classic" && candidate.treeMode !== "custom") ||
+    candidate.version !== 4 ||
     !Array.isArray(candidate.decorations) || candidate.decorations.length > MAX_DECORATIONS ||
-    !Array.isArray(candidate.strokes) || candidate.strokes.length > MAX_DRAWING_STROKES ||
-    countDrawingPoints(candidate.strokes) > MAX_DRAWING_POINTS
+    !isTreeLights(candidate.lights)
   ) return false;
 
   const decorationIds = new Set<string>();
@@ -358,12 +360,15 @@ function isTreeDesign(value: unknown): value is TreeDesign {
     return true;
   })) return false;
 
-  const strokeIds = new Set<string>();
-  return candidate.strokes.every((stroke) => {
-    if (!isStroke(stroke) || strokeIds.has(stroke.id)) return false;
-    strokeIds.add(stroke.id);
-    return true;
-  });
+  return true;
+}
+
+function isTreeLights(value: unknown): value is TreeLights {
+  if (!value || typeof value !== "object") return false;
+  const lights = value as Partial<TreeLights>;
+  return typeof lights.enabled === "boolean" && ornamentColors.has(lights.color as OrnamentColor) &&
+    typeof lights.brightness === "number" && Number.isFinite(lights.brightness) && lights.brightness >= 0 && lights.brightness <= 1 &&
+    typeof lights.twinkle === "boolean";
 }
 
 function isStroke(value: unknown): value is TreeStroke {
@@ -373,7 +378,7 @@ function isStroke(value: unknown): value is TreeStroke {
     validId(stroke.id) &&
     penColors.has(stroke.color as TreePenColor) &&
     (stroke.width === 5 || stroke.width === 8 || stroke.width === 12) &&
-    Array.isArray(stroke.points) && stroke.points.length > 0 && stroke.points.length <= MAX_POINTS_PER_STROKE &&
+    Array.isArray(stroke.points) && stroke.points.length > 0 && stroke.points.length <= maxLegacyPointsPerStroke &&
     stroke.points.every(isTreePoint)
   );
 }
@@ -396,6 +401,7 @@ function isDecoration(value: unknown): value is TreeDecoration {
     typeof decoration.x === "number" && Number.isFinite(decoration.x) && decoration.x >= 0 && decoration.x <= 1 &&
     typeof decoration.y === "number" && Number.isFinite(decoration.y) && decoration.y >= 0 && decoration.y <= 1 &&
     typeof decoration.angle === "number" && Number.isFinite(decoration.angle) && decoration.angle >= 0 && decoration.angle <= 1 &&
+    typeof decoration.radius === "number" && Number.isFinite(decoration.radius) && decoration.radius >= 0.02 && decoration.radius <= 1 &&
     typeof decoration.rotation === "number" && Number.isFinite(decoration.rotation) && decoration.rotation >= -180 && decoration.rotation <= 180 &&
     typeof decoration.scale === "number" && Number.isFinite(decoration.scale) && decoration.scale >= 0.6 && decoration.scale <= 1.6 &&
     ornamentColors.has(decoration.color as OrnamentColor)
@@ -410,10 +416,6 @@ function countDrawingPoints(strokes: TreeStroke[] | undefined): number {
   return strokes?.reduce((total, stroke) => total + (Array.isArray(stroke.points) ? stroke.points.length : 0), 0) ?? 0;
 }
 
-function copyStroke(stroke: TreeStroke): TreeStroke {
-  return { ...stroke, points: stroke.points.map((point) => ({ ...point })) };
-}
-
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
@@ -422,10 +424,15 @@ function createDecoration(id: string, kind: OrnamentKind, x: number, y: number):
   return {
     id, kind, x, y,
     angle: legacyAngleForX(x),
+    radius: legacyRadiusForY(y),
     rotation: 0,
     scale: 1,
     color: defaultOrnamentColor[kind],
   };
+}
+
+function legacyRadiusForY(y: number): number {
+  return clamp(0.02 + (1 - (y - TREE_PLACEMENT_BOUNDS.minY) / (TREE_PLACEMENT_BOUNDS.maxY - TREE_PLACEMENT_BOUNDS.minY)) * 0.9, 0.02, 1);
 }
 
 function normalizeAngle(value: number): number {

@@ -74,7 +74,7 @@ export default function CountdownStopperGame({ onComplete }: CountdownStopperGam
         <span className="countdown-stopper__label">ӨНГӨРСӨН ХУГАЦАА</span>
         <strong data-testid="stopper-display" aria-live="off">{formatStopperTime(elapsedMs)}</strong>
         <span className="countdown-stopper__unit">секунд</span>
-        <div className="countdown-stopper__track" aria-hidden="true"><span style={{ transform: `scaleX(${Math.min(1, elapsedMs / targetMs)})` }} /></div>
+        <div className="countdown-stopper__track" aria-hidden="true" />
       </div>
 
       <div className="countdown-stopper__action">

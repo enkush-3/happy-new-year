@@ -1,9 +1,9 @@
 .tree-3d-shell { position: absolute; z-index: 1; inset: 0; overflow: hidden; outline: none; }
 .tree-3d-shell:focus-visible { box-shadow: inset 0 0 0 3px rgba(255, 222, 151, .78); }
-.tree-3d-shell.is-orbiting { cursor: grab; touch-action: pan-y; }
+.tree-3d-shell.is-orbiting { cursor: grab; touch-action: none; }
 .tree-3d-shell.is-orbiting:active { cursor: grabbing; }
 .tree-3d-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
-.tree-3d-shell.is-orbiting .tree-3d-canvas { touch-action: pan-y; }
+.tree-3d-shell.is-orbiting .tree-3d-canvas { touch-action: none; }
 .tree-3d-fallback { position: absolute; inset: 0; display: grid; place-items: center; }
 .tree-3d-status { position: absolute; z-index: 4; right: 12px; bottom: 12px; left: 12px; margin: 0; padding: 9px 13px; border: 1px solid rgba(230, 239, 255, .2); border-radius: 999px; color: #f8f2e6; background: rgba(11, 19, 32, .82); font-size: 12px; line-height: 1.4; text-align: center; pointer-events: none; }
 .tree-3d-instructions { position: absolute; right: 14px; bottom: 14px; left: 14px; max-width: 520px; margin: 0 auto; padding: 8px 12px; border-radius: 999px; color: #f7f0e2; background: rgba(11, 19, 32, .72); font-size: 11px; text-align: center; pointer-events: none; }

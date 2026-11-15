@@ -1,21 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   addDecoration,
-  addStroke,
   decodeTreeFragment,
   DEFAULT_TREE_DESIGN,
   duplicateDecoration,
   encodeTreeFragment,
   MAX_DECORATIONS,
-  MAX_POINTS_PER_STROKE,
-  MAX_DRAWING_STROKES,
   moveDecoration,
   removeDecoration,
-  removeStroke,
   transformDecoration,
   type TreeDecoration,
   type TreeDesign,
-  type TreeStroke,
 } from "./tree-state";
 
 const ornament = (id: string, x = 0.5, y = 0.5): TreeDecoration => ({
@@ -24,43 +19,40 @@ const ornament = (id: string, x = 0.5, y = 0.5): TreeDecoration => ({
   x,
   y,
   angle: Math.round((0.5 + (x - 0.5) * 0.8) * 1000) / 1000,
+  radius: 0.5,
   rotation: 0,
   scale: 1,
   color: "#d96b5e",
 });
 
 describe("tree design state", () => {
-  it("adds and removes a freehand stroke without mutating earlier state", () => {
-    const stroke: TreeStroke = {
-      id: "ink-1",
-      color: "berry",
-      width: 8,
-      points: [{ x: 0.2, y: 0.3 }, { x: 0.4, y: 0.5 }],
-    };
-    const drawn = addStroke(DEFAULT_TREE_DESIGN, stroke);
+  it("stores configurable twinkling strand settings in the current share version", () => {
+    const design = {
+      ...DEFAULT_TREE_DESIGN,
+      lights: { enabled: true, color: "#98d8f2", brightness: 0.65, twinkle: false },
+    } as TreeDesign;
 
-    expect(drawn.strokes).toEqual([stroke]);
-    expect(DEFAULT_TREE_DESIGN.strokes).toEqual([]);
-    expect(removeStroke(drawn, stroke.id).strokes).toEqual([]);
+    const restored = decodeTreeFragment(encodeTreeFragment(design));
+
+    expect(restored.valid).toBe(true);
+    expect(restored.design.version).toBe(4);
+    expect(restored.design.lights).toEqual({ enabled: true, color: "#98d8f2", brightness: 0.65, twinkle: false });
   });
 
-  it("round-trips a custom tree drawing and ornaments through a share fragment", () => {
-    const design: TreeDesign = {
-      version: 3,
-      treeMode: "custom",
-      decorations: [ornament("bauble", 0.4, 0.5)],
-      strokes: [{
-        id: "ink-1",
-        color: "snow",
-        width: 8,
-        points: [{ x: 0.18, y: 0.2 }, { x: 0.51, y: 0.55 }, { x: 0.82, y: 0.2 }],
-      }],
-    };
+  it("keeps ornaments from old hand-drawn links and reports discarded strokes", () => {
+    const legacyBase64 = btoa(JSON.stringify({
+      v: 3,
+      m: "c",
+      d: [["old-star", "s", 500, 300, 500, 0, 100, "s"]],
+      s: [["old-ink", "w", 1, "AAEAAQ"]],
+    })).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
 
-    const fragment = encodeTreeFragment(design);
+    const restored = decodeTreeFragment(`#tree=${legacyBase64}`);
 
-    expect(fragment.length).toBeLessThan(4096);
-    expect(decodeTreeFragment(fragment)).toEqual({ design, valid: true });
+    expect(restored.valid).toBe(true);
+    expect(restored.discardedLegacyDrawing).toBe(true);
+    expect(restored.design.version).toBe(4);
+    expect(restored.design.decorations).toHaveLength(1);
   });
 
   it("round-trips 3D ornament edits through the next share format", () => {
@@ -94,21 +86,6 @@ describe("tree design state", () => {
     expect(duplicated.decorations[1].x).not.toBe(duplicated.decorations[0].x);
   });
 
-  it("round-trips the maximum-length stroke through a share fragment", () => {
-    const points = Array.from({ length: MAX_POINTS_PER_STROKE }, (_, index) => ({
-      x: Math.round((index / (MAX_POINTS_PER_STROKE - 1)) * 1000) / 1000,
-      y: Math.round(((index % 9) / 8) * 1000) / 1000,
-    }));
-    const design: TreeDesign = {
-      ...DEFAULT_TREE_DESIGN,
-      treeMode: "custom",
-      strokes: [{ id: "long-stroke", color: "ice", width: 12, points }],
-    };
-    const fragment = encodeTreeFragment(design);
-
-    expect(decodeTreeFragment(fragment)).toEqual({ design, valid: true });
-  });
-
   it("restores legacy version 1 links as classic trees", () => {
     const legacyBase64 = btoa(JSON.stringify({
       v: 1,
@@ -118,13 +95,12 @@ describe("tree design state", () => {
 
     expect(decodeTreeFragment(legacy)).toEqual({
       design: {
-        version: 3,
-        treeMode: "classic",
+        version: 4,
+        lights: DEFAULT_TREE_DESIGN.lights,
         decorations: [{
           id: "legacy-star", kind: "star", x: 0.5, y: 0.3,
-          angle: 0.5, rotation: 0, scale: 1, color: "#ffd978",
+          angle: 0.5, radius: expect.any(Number), rotation: 0, scale: 1, color: "#ffd978",
         }],
-        strokes: [],
       },
       valid: true,
     });
@@ -140,10 +116,10 @@ describe("tree design state", () => {
     const restored = decodeTreeFragment(`#tree=${legacyBase64}`);
 
     expect(restored.valid).toBe(true);
-    expect(restored.design.version).toBe(3);
+    expect(restored.design.version).toBe(4);
     expect(restored.design.decorations[0]).toMatchObject({
       id: "old-bauble", kind: "bauble-red", x: 0.6, y: 0.4,
-      angle: 0.58, rotation: 0, scale: 1, color: "#d96b5e",
+      angle: 0.58, radius: expect.any(Number), rotation: 0, scale: 1, color: "#d96b5e",
     });
   });
 
@@ -164,7 +140,7 @@ describe("tree design state", () => {
   });
 
   it("rejects an unsupported number of freehand strokes", () => {
-    const strokes = Array.from({ length: MAX_DRAWING_STROKES + 1 }, (_, index) => ({
+    const strokes = Array.from({ length: 17 }, (_, index) => ({
       id: `ink-${index}`,
       color: "snow",
       width: 7,
