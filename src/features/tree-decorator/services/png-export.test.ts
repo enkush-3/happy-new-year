@@ -12,7 +12,12 @@ describe("tree image export", () => {
     svg.setAttribute("viewBox", "0 0 400 560");
     const tree = document.createElementNS("http://www.w3.org/2000/svg", "path");
     tree.setAttribute("d", "M200 0 400 560H0z");
-    svg.append(tree);
+    const selection = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    selection.setAttribute("class", "tree-decoration-selection");
+    const hint = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    hint.setAttribute("class", "draw-empty-hint");
+    hint.textContent = "Модоо энд зураарай";
+    svg.append(tree, selection, hint);
 
     const blob = serializeTreeSvg(svg);
     const content = await blob.text();
@@ -22,6 +27,9 @@ describe("tree image export", () => {
     expect(content).toContain('height="1680"');
     expect(content).toContain("#10192d");
     expect(content).toContain("M200 0 400 560H0z");
+    expect(content).not.toContain("tree-decoration-selection");
+    expect(content).not.toContain("draw-empty-hint");
+    expect(content).not.toContain("Модоо энд зураарай");
   });
 
   it("rasterizes the SVG and starts a PNG download", async () => {

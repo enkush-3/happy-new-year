@@ -4,6 +4,7 @@ const svgNamespace = "http://www.w3.org/2000/svg";
 
 export function serializeTreeSvg(svg: SVGSVGElement): Blob {
   const clone = svg.cloneNode(true) as SVGSVGElement;
+  clone.querySelectorAll(".tree-decoration-selection, .draw-empty-hint").forEach((element) => element.remove());
   clone.setAttribute("xmlns", svgNamespace);
   clone.setAttribute("width", String(exportWidth));
   clone.setAttribute("height", String(exportHeight));

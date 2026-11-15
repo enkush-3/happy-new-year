@@ -1,297 +1,58 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router";
+import { describe, expect, it } from "vitest";
 import App from "./App";
-import { decodeTreeFragment, DEFAULT_TREE_DESIGN, encodeTreeFragment } from "./lib/tree-state";
-import type { TreeDesign } from "./lib/tree-state";
-import { downloadTreePng } from "./lib/png-export";
 
-vi.mock("./lib/png-export", () => ({ downloadTreePng: vi.fn(async () => undefined) }));
+function renderApp(initialEntry = "/") {
+  return render(
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <App />
+    </MemoryRouter>,
+  );
+}
 
-describe("Happy New Year tree builder", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
+describe("Happy New Year game hub", () => {
+  it("shows the local 2027 countdown from the home route", () => {
+    renderApp("/");
+
+    expect(screen.getByRole("heading", { name: /2027/i })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Үндсэн цэс" })).toBeInTheDocument();
+    expect(screen.getByText(/хоног/)).toBeInTheDocument();
   });
 
-  beforeEach(() => {
-    vi.unstubAllGlobals();
-    window.history.replaceState(null, "", "/");
-    vi.clearAllMocks();
+  it("lists all six new games and the existing tree decorator", () => {
+    renderApp("/games");
+
+    expect(screen.getByRole("heading", { name: "Тоглоомууд" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /Тоглох/ })).toHaveLength(7);
   });
 
-  it("lets a player choose an ornament and place it on the tree", async () => {
+  it("navigates from the header to the game library", async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp("/");
 
-    await user.click(screen.getByRole("button", { name: "Улаан бөмбөлөг сонгох" }));
-    await user.click(screen.getByRole("group", { name: "Чимэглэх гацуур" }));
+    await user.click(screen.getByRole("link", { name: "Тоглоомууд" }));
 
-    expect(screen.getByRole("button", { name: "Модон дээрх Улаан бөмбөлөг" })).toBeInTheDocument();
-    expect(screen.getByText(/1 чимэглэл/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Тоглоомууд" })).toBeInTheDocument();
   });
 
-  it("places an ornament when it is dragged from the palette onto the tree", () => {
-    render(<App />);
-    const tree = screen.getByRole("group", { name: "Чимэглэх гацуур" });
-    vi.spyOn(tree, "getBoundingClientRect").mockReturnValue({
-      x: 0, y: 0, left: 0, top: 0, right: 600, bottom: 560, width: 600, height: 560,
-      toJSON: () => ({}),
-    } as DOMRect);
-    const paletteItem = screen.getByRole("button", { name: "Улаан бөмбөлөг сонгох" });
+  it("opens a game from its stable route", () => {
+    renderApp("/games/countdown-stopper");
 
-    fireEvent.pointerDown(paletteItem, { pointerId: 3, button: 0, clientX: 30, clientY: 30 });
-    fireEvent.pointerMove(window, { pointerId: 3, clientX: 140, clientY: 160 });
-    fireEvent.pointerUp(tree, { pointerId: 3, clientX: 300, clientY: 280 });
-
-    expect(screen.getByRole("button", { name: "Модон дээрх Улаан бөмбөлөг" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Яг цагт нь зогсоо" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /эхлэх/i })).toBeInTheDocument();
   });
 
-  it("supports keyboard placement and deleting the focused ornament", async () => {
-    const user = userEvent.setup();
-    render(<App />);
+  it("routes legacy tree share links to the preserved tree builder", async () => {
+    renderApp("/#tree=eyJ2IjoxLCJkIjpbXX0");
 
-    await user.click(screen.getByRole("button", { name: "Алтан од сонгох" }));
-    const tree = screen.getByRole("group", { name: "Чимэглэх гацуур" });
-    tree.focus();
-    fireEvent.keyDown(tree, { key: "Enter" });
-
-    const star = screen.getByRole("button", { name: "Модон дээрх Алтан од" });
-    const originalPosition = star.getAttribute("transform");
-    star.focus();
-    fireEvent.keyDown(star, { key: "ArrowRight" });
-    expect(star.getAttribute("transform")).not.toBe(originalPosition);
-    fireEvent.keyDown(star, { key: "Delete" });
-    expect(screen.queryByRole("button", { name: "Модон дээрх Алтан од" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Модоо өөрийнхөөрөө бүтээ" })).toBeInTheDocument();
   });
 
-  it("lets the player drag a placed ornament to another tree branch", async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    const tree = screen.getByRole("group", { name: "Чимэглэх гацуур" });
-    vi.spyOn(tree, "getBoundingClientRect").mockReturnValue({
-      x: 0, y: 0, left: 0, top: 0, right: 400, bottom: 560, width: 400, height: 560,
-      toJSON: () => ({}),
-    } as DOMRect);
+  it("shows a not-found page for unknown games", () => {
+    renderApp("/games/unknown-game");
 
-    await user.click(screen.getByRole("button", { name: "Улаан бөмбөлөг сонгох" }));
-    fireEvent.click(tree, { clientX: 200, clientY: 280 });
-    const ball = screen.getByRole("button", { name: "Модон дээрх Улаан бөмбөлөг" });
-    const originalPosition = ball.getAttribute("transform");
-
-    fireEvent.pointerDown(ball, { pointerId: 1, button: 0, clientX: 200, clientY: 280 });
-    fireEvent.pointerMove(tree, { pointerId: 1, clientX: 280, clientY: 360 });
-    fireEvent.pointerUp(tree, { pointerId: 1, clientX: 280, clientY: 360 });
-
-    expect(ball.getAttribute("transform")).not.toBe(originalPosition);
-  });
-
-  it("lets the player draw, share, and undo a custom tree stroke", async () => {
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.click(screen.getByRole("button", { name: "Өөрөө модоо зурах" }));
-    const tree = screen.getByRole("group", { name: "Өөрөө зурж бүтээх мод" });
-    vi.spyOn(tree, "getBoundingClientRect").mockReturnValue({
-      x: 0, y: 0, left: 0, top: 0, right: 400, bottom: 560, width: 400, height: 560,
-      toJSON: () => ({}),
-    } as DOMRect);
-
-    fireEvent.pointerDown(tree, { pointerId: 7, button: 0, clientX: 120, clientY: 180 });
-    fireEvent.pointerMove(tree, { pointerId: 7, clientX: 170, clientY: 240 });
-    fireEvent.pointerUp(tree, { pointerId: 7, clientX: 210, clientY: 300 });
-
-    expect(screen.getByTestId("tree-stroke")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Линк хуулах" }));
-    const shareInput = screen.getByLabelText("Модны share линк") as HTMLInputElement;
-    const sharedDesign = decodeTreeFragment(new URL(shareInput.value).hash);
-    expect(sharedDesign.design.treeMode).toBe("custom");
-    expect(sharedDesign.design.strokes).toHaveLength(1);
-
-    await user.click(screen.getByRole("button", { name: "Баллуур" }));
-    fireEvent.pointerDown(tree, { pointerId: 8, button: 0, clientX: 170, clientY: 240 });
-    fireEvent.pointerUp(tree, { pointerId: 8, clientX: 170, clientY: 240 });
-    expect(screen.queryByTestId("tree-stroke")).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Сүүлчийн зурсан зураасыг буцаах" }));
-    expect(screen.getByTestId("tree-stroke")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Сүүлчийн зурсан зураасыг буцаах" }));
-    expect(screen.queryByTestId("tree-stroke")).not.toBeInTheDocument();
-  });
-
-  it("keeps the middle of a long custom stroke when saving it", async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    await user.click(screen.getByRole("button", { name: "Өөрөө модоо зурах" }));
-    const tree = screen.getByRole("group", { name: "Өөрөө зурж бүтээх мод" });
-    vi.spyOn(tree, "getBoundingClientRect").mockReturnValue({
-      x: 0, y: 0, left: 0, top: 0, right: 400, bottom: 560, width: 400, height: 560,
-      toJSON: () => ({}),
-    } as DOMRect);
-
-    fireEvent.pointerDown(tree, { pointerId: 17, button: 0, clientX: 60, clientY: 120 });
-    for (let index = 0; index < 120; index += 1) {
-      fireEvent.pointerMove(tree, {
-        pointerId: 17,
-        clientX: 60 + (index % 10) * 25,
-        clientY: 120 + Math.floor(index / 10) * 22,
-      });
-    }
-    fireEvent.pointerUp(tree, { pointerId: 17, clientX: 285, clientY: 362 });
-
-    expect(screen.getByTestId("tree-stroke").getAttribute("d")).toContain("60 340");
-
-    await user.click(screen.getByRole("button", { name: "Бэлэн гацуур" }));
-    expect(screen.queryByTestId("tree-stroke")).not.toBeInTheDocument();
-    expect(screen.getByTestId("classic-tree")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Өөрөө модоо зурах" }));
-    expect(screen.getByTestId("tree-stroke")).toBeInTheDocument();
-  });
-
-  it("lets drawing start over a placed ornament", async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    await user.click(screen.getByRole("button", { name: "Өөрөө модоо зурах" }));
-    const tree = screen.getByRole("group", { name: "Өөрөө зурж бүтээх мод" });
-    vi.spyOn(tree, "getBoundingClientRect").mockReturnValue({
-      x: 0, y: 0, left: 0, top: 0, right: 400, bottom: 560, width: 400, height: 560,
-      toJSON: () => ({}),
-    } as DOMRect);
-    await user.click(screen.getByRole("button", { name: "Алтан од сонгох" }));
-    fireEvent.click(tree, { clientX: 200, clientY: 280 });
-    const star = screen.getByRole("button", { name: "Модон дээрх Алтан од" });
-    await user.click(screen.getByRole("button", { name: "Сойз" }));
-
-    fireEvent.pointerDown(star, { pointerId: 23, button: 0, clientX: 200, clientY: 280 });
-    fireEvent.pointerMove(tree, { pointerId: 23, clientX: 250, clientY: 330 });
-    fireEvent.pointerUp(tree, { pointerId: 23, clientX: 250, clientY: 330 });
-
-    expect(screen.getByTestId("tree-stroke")).toBeInTheDocument();
-  });
-
-  it("supports keyboard drawing and erasing on a custom tree", async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    await user.click(screen.getByRole("button", { name: "Өөрөө модоо зурах" }));
-    const tree = screen.getByRole("group", { name: "Өөрөө зурж бүтээх мод" });
-    tree.focus();
-    fireEvent.keyDown(tree, { key: "Enter" });
-    fireEvent.keyDown(tree, { key: "ArrowDown" });
-    fireEvent.keyDown(tree, { key: "ArrowRight" });
-    fireEvent.keyDown(tree, { key: "Enter" });
-
-    expect(screen.getByTestId("tree-stroke")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Баллуур" }));
-    tree.focus();
-    fireEvent.keyDown(tree, { key: "Delete" });
-    expect(screen.queryByTestId("tree-stroke")).not.toBeInTheDocument();
-  });
-
-  it("keeps tree-light colors in the SVG so PNG export retains them", () => {
-    render(<App />);
-    const svg = screen.getByRole("group", { name: "Чимэглэх гацуур" });
-    const lights = svg.querySelectorAll(".tree-light");
-
-    expect(lights.length).toBeGreaterThan(0);
-    expect(lights[0]).toHaveAttribute("fill", "#ffe3a1");
-    expect(lights[3]).toHaveAttribute("fill", "#c1e6ef");
-  });
-
-  it("restores a shared tree from the URL fragment", () => {
-    const design: TreeDesign = {
-      ...DEFAULT_TREE_DESIGN,
-      decorations: [{ id: "shared-star", kind: "star", x: 0.5, y: 0.3 }],
-    };
-    window.history.replaceState(null, "", `/${encodeTreeFragment(design)}`);
-    render(<App />);
-
-    expect(screen.getByRole("button", { name: "Модон дээрх Алтан од" })).toBeInTheDocument();
-  });
-
-  it("restores a custom hand-drawn tree from the URL fragment", () => {
-    const design: TreeDesign = {
-      ...DEFAULT_TREE_DESIGN,
-      treeMode: "custom",
-      strokes: [{
-        id: "shared-stroke",
-        color: "ice",
-        width: 8,
-        points: [{ x: 0.5, y: 0.1 }, { x: 0.25, y: 0.8 }, { x: 0.75, y: 0.8 }],
-      }],
-    };
-    window.history.replaceState(null, "", `/${encodeTreeFragment(design)}`);
-    render(<App />);
-
-    expect(screen.getByRole("group", { name: "Өөрөө зурж бүтээх мод" })).toBeInTheDocument();
-    expect(screen.getByTestId("tree-stroke")).toHaveAttribute("stroke", "#98d8f2");
-    expect(screen.getByRole("button", { name: "Баллуур" })).toBeInTheDocument();
-  });
-
-  it("shows a manual-copy fallback when clipboard access is unavailable", async () => {
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.click(screen.getByRole("button", { name: "Хуваалцах" }));
-
-    const link = screen.getByLabelText("Модны share линк") as HTMLInputElement;
-    expect(link.value).toContain("#tree=");
-    expect(link.value).toContain(window.location.origin);
-  });
-
-  it("keeps native sharing and direct link copying as separate actions", async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    const nativeNavigator = navigator;
-    const share = vi.fn(async () => undefined);
-    const writeText = vi.fn(async () => undefined);
-    const mockedNavigator = Object.create(nativeNavigator) as Navigator & {
-      share: typeof share;
-      clipboard: { writeText: typeof writeText };
-    };
-    Object.defineProperty(mockedNavigator, "share", { configurable: true, value: share });
-    Object.defineProperty(mockedNavigator, "clipboard", {
-      configurable: true,
-      value: { writeText },
-    });
-    vi.stubGlobal("navigator", mockedNavigator);
-
-    await user.click(screen.getByRole("button", { name: "Хуваалцах" }));
-    expect(share).toHaveBeenCalledWith(expect.objectContaining({ url: expect.stringContaining("#tree=") }));
-
-    await user.click(screen.getByRole("button", { name: "Линк хуулах" }));
-    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("#tree="));
-    expect(share).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not include arbitrary page query parameters in shared links", async () => {
-    const user = userEvent.setup();
-    window.history.replaceState(null, "", "/?access_token=private-value");
-    render(<App />);
-
-    await user.click(screen.getByRole("button", { name: "Линк хуулах" }));
-
-    const link = screen.getByLabelText("Модны share линк") as HTMLInputElement;
-    expect(link.value).toContain("#tree=");
-    expect(link.value).not.toContain("access_token");
-    expect(link.value).not.toContain("private-value");
-    expect(new URL(link.value).search).toBe("");
-    expect(window.location.search).toBe("");
-  });
-
-  it("exports the rendered tree as a PNG", async () => {
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.click(screen.getByRole("button", { name: "PNG зураг татах" }));
-
-    await waitFor(() => expect(downloadTreePng).toHaveBeenCalledTimes(1));
-    expect(screen.getByText(/зураг бэлэн/)).toBeInTheDocument();
-  });
-
-  it("shows a clear message when the shared URL is malformed", () => {
-    window.history.replaceState(null, "", "/#tree=not-valid!");
-    render(<App />);
-
-    expect(screen.getByText(/линк буруу байна/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Модон дээрх/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Тоглоом олдсонгүй" })).toBeInTheDocument();
   });
 });

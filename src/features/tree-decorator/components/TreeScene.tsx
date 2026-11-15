@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from "react";
-import type { OrnamentKind, TreeDecoration, TreeDesign, TreePenColor, TreePenWidth, TreePoint, TreeStroke } from "../lib/tree-state";
-import { MAX_POINTS_PER_STROKE, TREE_PLACEMENT_BOUNDS } from "../lib/tree-state";
+import type { OrnamentKind, TreeDecoration, TreeDesign, TreePenColor, TreePenWidth, TreePoint, TreeStroke } from "../model/tree-state";
+import { MAX_POINTS_PER_STROKE, TREE_PLACEMENT_BOUNDS } from "../model/tree-state";
 
 export type TreeTool = "draw" | "erase" | "decorate";
 const maxActivePointerPoints = 2048;
@@ -120,6 +120,7 @@ export default function TreeScene({
   const activePointerId = useRef<number | null>(null);
   const activePoints = useRef<TreePoint[]>([]);
   const erasedIds = useRef(new Set<string>());
+  const suppressPlacementClick = useRef(false);
   const [previewPoints, setPreviewPoints] = useState<TreePoint[] | null>(null);
   const [keyboardPoints, setKeyboardPoints] = useState<TreePoint[]>([]);
   const isCustom = design.treeMode === "custom";
@@ -189,10 +190,19 @@ export default function TreeScene({
       setPreviewPoints(null);
       erasedIds.current.clear();
     }
-    draggingId.current = null;
+    if (draggingId.current) {
+      draggingId.current = null;
+      window.setTimeout(() => {
+        suppressPlacementClick.current = false;
+      }, 0);
+    }
   }
 
   function handlePointerCancel(event: PointerEvent<SVGSVGElement>) {
+    if (draggingId.current) {
+      draggingId.current = null;
+      suppressPlacementClick.current = false;
+    }
     if (activePointerId.current !== event.pointerId) return;
     activePointerId.current = null;
     activePoints.current = [];
@@ -270,13 +280,21 @@ export default function TreeScene({
     if (isCustom && drawingTool !== "decorate") return;
     event.stopPropagation();
     event.preventDefault();
+    suppressPlacementClick.current = true;
     onSelect(decoration.id);
     draggingId.current = decoration.id;
     try {
-      svgRef.current?.setPointerCapture(event.pointerId);
+      event.currentTarget.setPointerCapture(event.pointerId);
     } catch {
       // Pointer capture is not exposed by every browser or test environment.
     }
+  }
+
+  function handleDecorationPointerUp() {
+    draggingId.current = null;
+    window.setTimeout(() => {
+      suppressPlacementClick.current = false;
+    }, 0);
   }
 
   function handleDecorationKeyDown(event: KeyboardEvent<SVGGElement>, decoration: TreeDecoration) {
@@ -323,6 +341,10 @@ export default function TreeScene({
       aria-description={interactionLabel}
       tabIndex={0}
       onClick={(event) => {
+        if (suppressPlacementClick.current) {
+          suppressPlacementClick.current = false;
+          return;
+        }
         if (drawingTool !== "decorate") return;
         const point = svgRef.current
           ? isCustom
@@ -410,16 +432,17 @@ export default function TreeScene({
           tabIndex={0}
           data-testid="placed-decoration"
           onClick={(event) => {
+            suppressPlacementClick.current = false;
             event.stopPropagation();
             onSelect(decoration.id);
           }}
           onPointerDown={(event) => handleDecorationPointerDown(event, decoration)}
-          onPointerUp={() => { draggingId.current = null; }}
+          onPointerUp={handleDecorationPointerUp}
           onKeyDown={(event) => handleDecorationKeyDown(event, decoration)}
           className={`tree-decoration${selectedDecorationId === decoration.id ? " is-selected" : ""}`}
         >
           {selectedDecorationId === decoration.id && (
-            <circle r="23" fill="#fff5d6" fillOpacity=".12" stroke="#fff0c1" strokeWidth="2" strokeDasharray="4 5" />
+            <circle className="tree-decoration-selection" r="23" fill="#fff5d6" fillOpacity=".12" stroke="#fff0c1" strokeWidth="2" strokeDasharray="4 5" />
           )}
           <g className="ornament-pop" aria-hidden="true">
             {decoration.kind === "star" ? (
