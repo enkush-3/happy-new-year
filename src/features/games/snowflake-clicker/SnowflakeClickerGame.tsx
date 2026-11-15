@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { awardSnowflakeHit, SNOWFLAKE_CLICKER_DURATION_MS } from "./model";
+import { awardSnowflakeHit, getSnowflakeDifficulty, SNOWFLAKE_CLICKER_DURATION_MS } from "./model";
 import "./snowflake-clicker.css";
 
 export interface SnowflakeClickerResult {
@@ -29,60 +29,109 @@ interface GameState {
 }
 
 const emptyGame: GameState = { status: "ready", elapsedMs: 0, score: 0, hits: 0, targets: [] };
+const clockCheckMs = 100;
 
 export default function SnowflakeClickerGame({ onComplete }: SnowflakeClickerGameProps) {
   const [game, setGame] = useState<GameState>(emptyGame);
+  const gameRef = useRef(game);
+  const startedAt = useRef(0);
+  const hiddenAt = useRef<number | null>(null);
   const nextTargetId = useRef(0);
+  const nextSpawnAt = useRef(0);
   const resultSent = useRef(false);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   useEffect(() => {
     if (game.status !== "running") return;
 
-    const interval = window.setInterval(() => {
-      setGame((current) => {
-        if (current.status !== "running") return current;
-        const elapsedMs = Math.min(current.elapsedMs + 100, SNOWFLAKE_CLICKER_DURATION_MS);
-        const targets = current.targets.filter((target) => target.expiresAtMs > elapsedMs);
-        if (elapsedMs % 700 === 0) targets.push(createTarget(nextTargetId.current++, elapsedMs));
-        return {
-          ...current,
-          elapsedMs,
-          targets,
-          status: elapsedMs >= SNOWFLAKE_CLICKER_DURATION_MS ? "finished" : "running",
-        };
-      });
-    }, 100);
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        hiddenAt.current ??= Date.now();
+      } else if (hiddenAt.current !== null) {
+        startedAt.current += Date.now() - hiddenAt.current;
+        hiddenAt.current = null;
+      }
+    }
 
-    return () => window.clearInterval(interval);
+    if (document.visibilityState === "hidden") hiddenAt.current = Date.now();
+    function tick() {
+      if (document.visibilityState === "hidden") return;
+      const current = gameRef.current;
+      if (current.status !== "running") return;
+
+      const elapsedMs = Math.min(Math.max(0, Date.now() - startedAt.current), SNOWFLAKE_CLICKER_DURATION_MS);
+      const targets = current.targets.filter((target) => target.expiresAtMs > elapsedMs);
+      while (nextSpawnAt.current <= elapsedMs && elapsedMs < SNOWFLAKE_CLICKER_DURATION_MS) {
+        const spawnAt = nextSpawnAt.current;
+        const pace = getSnowflakeDifficulty(spawnAt);
+        targets.push(createTarget(nextTargetId.current++, spawnAt, pace.lifetimeMs));
+        nextSpawnAt.current += pace.spawnIntervalMs;
+      }
+
+      if (elapsedMs >= SNOWFLAKE_CLICKER_DURATION_MS) {
+        const finalGame = { ...current, status: "finished" as const, elapsedMs: SNOWFLAKE_CLICKER_DURATION_MS, targets: [] };
+        commit(finalGame);
+        if (!resultSent.current) {
+          resultSent.current = true;
+          onCompleteRef.current({
+            gameId: "snowflake-clicker",
+            score: finalGame.score,
+            hits: finalGame.hits,
+            elapsedMs: finalGame.elapsedMs,
+          });
+        }
+        return;
+      }
+
+      const displayElapsedMs = Math.floor(elapsedMs / 1_000) * 1_000;
+      const targetsChanged = targets.length !== current.targets.length || targets.some((target, index) => target.id !== current.targets[index]?.id);
+      if (displayElapsedMs !== current.elapsedMs || targetsChanged) {
+        commit({ ...current, elapsedMs: displayElapsedMs, targets });
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    const timer = window.setInterval(tick, clockCheckMs);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.clearInterval(timer);
+      hiddenAt.current = null;
+    };
   }, [game.status]);
 
-  useEffect(() => {
-    if (game.status !== "finished" || resultSent.current) return;
-    resultSent.current = true;
-    onComplete({ gameId: "snowflake-clicker", score: game.score, hits: game.hits, elapsedMs: game.elapsedMs });
-  }, [game, onComplete]);
+  function commit(next: GameState) {
+    gameRef.current = next;
+    setGame(next);
+  }
 
   function startGame() {
     resultSent.current = false;
     nextTargetId.current = 1;
-    setGame({
+    nextSpawnAt.current = getSnowflakeDifficulty(0).spawnIntervalMs;
+    startedAt.current = Date.now();
+    hiddenAt.current = null;
+    commit({
       ...emptyGame,
       status: "running",
-      targets: [{ id: 0, x: 50, y: 50, expiresAtMs: 2_000 }],
+      targets: [createTarget(0, 0, getSnowflakeDifficulty(0).lifetimeMs)],
     });
   }
 
   function hitTarget(id: number) {
-    setGame((current) => {
-      if (current.status !== "running") return current;
-      const target = current.targets.find((item) => item.id === id);
-      if (!target) return current;
-      const result = awardSnowflakeHit(current);
-      return { ...current, ...result, targets: current.targets.filter((item) => item.id !== id) };
-    });
+    const current = gameRef.current;
+    if (current.status !== "running") return;
+    const target = current.targets.find((item) => item.id === id);
+    if (!target) return;
+    const next = {
+      ...current,
+      ...awardSnowflakeHit(current),
+      targets: current.targets.filter((item) => item.id !== id),
+    };
+    commit(next);
   }
 
-  const secondsLeft = Math.ceil((SNOWFLAKE_CLICKER_DURATION_MS - game.elapsedMs) / 1000);
+  const secondsLeft = Math.ceil((SNOWFLAKE_CLICKER_DURATION_MS - game.elapsedMs) / 1_000);
 
   return (
     <section className="mini-game snowflake-clicker" aria-labelledby="snowflake-clicker-title">
@@ -90,7 +139,7 @@ export default function SnowflakeClickerGame({ onComplete }: SnowflakeClickerGam
         <div>
           <p className="mini-game__eyebrow">2D REACTION · 30 СЕКУНД</p>
           <h2 id="snowflake-clicker-title">Цасан ширхэгийн сорил</h2>
-          <p className="mini-game__description">Гарч ирсэн цасан ширхэгийг хурдан товшиж оноогоо нэмээрэй.</p>
+          <p className="mini-game__description">Гарч ирсэн цасан ширхэгийг хурдан товшиж оноогоо нэмээрэй. Цаг дуусах тусам хэцүү болно.</p>
         </div>
         <div className="snowflake-clicker__stats" aria-live="polite">
           <span><b>{game.score}</b> оноо</span>
@@ -98,7 +147,7 @@ export default function SnowflakeClickerGame({ onComplete }: SnowflakeClickerGam
         </div>
       </header>
 
-      <div className="snowflake-clicker__arena" aria-label="Цасан ширхэг дарах талбай">
+      <div className="snowflake-clicker__arena" role="region" aria-label="Цасан ширхэг дарах талбай">
         {game.targets.map((target) => (
           <button
             key={target.id}
@@ -123,11 +172,11 @@ export default function SnowflakeClickerGame({ onComplete }: SnowflakeClickerGam
   );
 }
 
-function createTarget(id: number, elapsedMs: number): Target {
+function createTarget(id: number, spawnAtMs: number, lifetimeMs: number): Target {
   return {
     id,
     x: 9 + Math.random() * 82,
     y: 12 + Math.random() * 70,
-    expiresAtMs: elapsedMs + 1_800,
+    expiresAtMs: spawnAtMs + lifetimeMs,
   };
 }

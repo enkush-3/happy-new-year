@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "../../app/App";
 import { encodeGameResult } from "../../features/games/shared/gameShare";
 
@@ -20,6 +20,8 @@ function renderAt(path: string) {
   );
 }
 
+afterEach(() => vi.useRealTimers());
+
 describe("shared game result routes", () => {
   it("restores the exact result from its share URL", () => {
     renderAt(`/games/gift-catcher?result=${encodeGameResult(sharedResult)}`);
@@ -34,5 +36,47 @@ describe("shared game result routes", () => {
 
     expect(screen.getByRole("button", { name: "Тоглож эхлэх" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "ТАНЫ ҮР ДҮН" })).not.toBeInTheDocument();
+  });
+
+  it("does not expose the retired Fortune Cookie route", () => {
+    renderAt("/games/fortune-cookie");
+
+    expect(screen.getByRole("heading", { name: "Тоглоом олдсонгүй" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Тоглоомууд руу буцах" })).toHaveAttribute("href", "/games");
+  });
+
+  it("shows stopper elapsed details and persists local session/device bests", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-15T00:00:00.000Z"));
+    window.sessionStorage.clear();
+    window.localStorage.clear();
+    renderAt("/games/countdown-stopper");
+
+    fireEvent.click(screen.getByRole("button", { name: "Тоглож эхлэх" }));
+    act(() => vi.advanceTimersByTime(20_270));
+    fireEvent.click(screen.getByRole("button", { name: "Зогсоох" }));
+
+    expect(screen.getByText(/Хэмжсэн хугацаа: 20\.270 сек/)).toBeInTheDocument();
+    expect(screen.getByText(/Энэ сессийн шилдэг:/)).toBeInTheDocument();
+    expect(screen.getByText(/Энэ төхөөрөмжийн шилдэг:/)).toBeInTheDocument();
+    expect(window.sessionStorage.getItem("happy-new-year:best:session:countdown-stopper")).not.toBeNull();
+    expect(window.localStorage.getItem("happy-new-year:best:device:countdown-stopper")).not.toBeNull();
+  });
+
+  it("does not update best records when opening a shared result", () => {
+    window.sessionStorage.clear();
+    window.localStorage.clear();
+    const sessionWrite = vi.spyOn(Storage.prototype, "setItem");
+    const result = {
+      gameId: "countdown-stopper" as const,
+      elapsedMs: 20_270,
+      deviationMs: 0,
+      score: 1_000,
+    };
+
+    renderAt(`/games/countdown-stopper?result=${encodeGameResult(result)}`);
+
+    expect(screen.getByText(/Хэмжсэн хугацаа: 20\.270 сек/)).toBeInTheDocument();
+    expect(sessionWrite).not.toHaveBeenCalled();
   });
 });

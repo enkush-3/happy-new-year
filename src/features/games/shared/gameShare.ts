@@ -32,17 +32,42 @@ export function decodeGameResult(encoded: string, expectedGameId?: GameId): Game
 export function presentGameResult(result: GameResult): GameResultPresentation {
   switch (result.gameId) {
     case "gift-catcher":
-      return { title: "Бэлэг баригч", text: `${result.score} оноо · ${result.giftsCaught} бэлэг тослоо` };
+      return {
+        title: "Бэлэг баригч",
+        text: `${result.score} оноо · ${result.giftsCaught} бэлэг тослоо`,
+        details: [`Саад мөргөсөн: ${result.hazardsHit}`, `Тоглосон хугацаа: ${formatSeconds(result.elapsedMs)} сек`],
+      };
     case "snowflake-clicker":
-      return { title: "Цасан ширхэг дарагч", text: `${result.score} оноо · ${result.hits} бай оноолоо` };
+      return {
+        title: "Цасан ширхэг дарагч",
+        text: `${result.score} оноо · ${result.hits} бай оноолоо`,
+        details: [`Оносон бай: ${result.hits}`, `Тоглосон хугацаа: ${formatSeconds(result.elapsedMs)} сек`],
+      };
     case "countdown-stopper":
-      return { title: "Яг цагт нь зогсоо", text: `Тэг цэгээс ${result.deviationMs} миллисекунд зөрлөө` };
+      if (!("elapsedMs" in result)) {
+        return {
+          title: "Яг цагт нь зогсоо",
+          text: `Хуучин үр дүн · ${result.deviationMs} мс зөрүү`,
+          details: ["Яг хэмжсэн хугацаа хадгалагдаагүй.", "Хуучин холбоос зорилтот хугацааг хадгалаагүй."],
+        };
+      }
+      return {
+        title: "Яг цагт нь зогсоо",
+        text: `Зорилтоос ${result.deviationMs} мс зөрлөө`,
+        details: [`Хэмжсэн хугацаа: ${formatSeconds(result.elapsedMs, 3)} сек`, `Зорилтот хугацаа: 20.270 сек`],
+      };
     case "sleigh-runner":
-      return { title: "Чарганы уралдаан", text: `${result.distance} метр · ${result.giftsCaught} бэлэг цуглууллаа` };
-    case "fortune-cookie":
-      return { title: "Ирэх жилийн ерөөл", text: result.fortunes.join("\n") };
+      return {
+        title: "Чарганы уралдаан",
+        text: `${result.distance} метр · ${result.giftsCaught} бэлэг цуглууллаа`,
+        details: [`Туулсан зай: ${result.distance} м`, `Цуглуулсан бэлэг: ${result.giftsCaught}`],
+      };
     case "trivia":
-      return { title: "Шинэ жилийн Trivia", text: `${result.correctAnswers}/${result.totalQuestions} зөв · ${result.archetype}` };
+      return {
+        title: "Шинэ жилийн Trivia",
+        text: `${result.correctAnswers}/${result.totalQuestions} зөв · ${result.archetype}`,
+        details: [`Зөв хариулт: ${result.correctAnswers} / ${result.totalQuestions}`, `Онооны хувь: ${Math.round((result.correctAnswers / result.totalQuestions) * 100)}%`],
+      };
   }
 }
 
@@ -66,14 +91,17 @@ function isGameResult(value: unknown): value is GameResult {
         isBoundedInt(result.hits, 0, 1_000_000) &&
         isBoundedInt(result.elapsedMs, 0, 30_000);
     case "countdown-stopper":
-      return isBoundedInt(result.deviationMs, 0, 60_000) && isBoundedInt(result.score, 0, 1_000);
+      if (!isBoundedInt(result.deviationMs, 0, 86_400_000) ||
+        !isBoundedInt(result.score, 0, 1_000) ||
+        result.score !== Math.max(0, 1_000 - result.deviationMs)) return false;
+      if (result.elapsedMs === undefined) return true;
+      return isBoundedInt(result.elapsedMs, 0, 86_400_000) &&
+        result.deviationMs === Math.abs(result.elapsedMs - 20_270);
     case "sleigh-runner":
       return isBoundedInt(result.distance, 0, 1_000_000) && isBoundedInt(result.giftsCaught, 0, 1_000_000);
-    case "fortune-cookie":
-      return Array.isArray(result.fortunes) && result.fortunes.length === 3 &&
-        result.fortunes.every((fortune) => typeof fortune === "string" && fortune.trim().length > 0 && fortune.length <= 160);
     case "trivia":
-      return isBoundedInt(result.correctAnswers, 0, 10) && result.totalQuestions === 10 &&
+      return isBoundedInt(result.totalQuestions, 10, 20) &&
+        isBoundedInt(result.correctAnswers, 0, result.totalQuestions) &&
         typeof result.archetype === "string" && result.archetype.length > 0 && result.archetype.length <= 48;
     default:
       return false;
@@ -82,4 +110,8 @@ function isGameResult(value: unknown): value is GameResult {
 
 function isBoundedInt(value: unknown, minimum: number, maximum: number): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= minimum && value <= maximum;
+}
+
+function formatSeconds(milliseconds: number, decimals = 2): string {
+  return (milliseconds / 1_000).toFixed(decimals);
 }

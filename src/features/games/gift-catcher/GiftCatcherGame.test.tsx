@@ -44,4 +44,42 @@ describe("GiftCatcherGame", () => {
     act(() => vi.advanceTimersByTime(30_100));
     expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ gameId: "gift-catcher", elapsedMs: 30_000 }));
   });
+
+  it("pauses the round while the document is hidden", () => {
+    vi.useFakeTimers();
+    render(<GiftCatcherGame onComplete={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Тоглож эхлэх" }));
+
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+    fireEvent(document, new Event("visibilitychange"));
+    act(() => vi.advanceTimersByTime(2_000));
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    fireEvent(document, new Event("visibilitychange"));
+    act(() => vi.advanceTimersByTime(300));
+
+    expect(screen.getByText("⏱ 30 сек")).toBeInTheDocument();
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+  });
+
+  it("moves the basket with the touch-friendly arrow controls", () => {
+    render(<GiftCatcherGame onComplete={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Тоглож эхлэх" }));
+    const basket = screen.getByTestId("gift-catcher-basket");
+    const before = basket.getAttribute("style");
+
+    fireEvent.click(screen.getByRole("button", { name: "Сагсыг баруун тийш" }));
+
+    expect(basket.getAttribute("style")).not.toBe(before);
+  });
+
+  it("transitions falling objects smoothly between timed position updates", () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    render(<GiftCatcherGame onComplete={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Тоглож эхлэх" }));
+    act(() => vi.advanceTimersByTime(700));
+
+    const fallingGift = screen.getByTestId("falling-gift");
+    expect((fallingGift as HTMLElement).style.transition).toBe("top 100ms linear");
+  });
 });

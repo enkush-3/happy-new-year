@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import TreeGame from "../../features/tree-decorator/TreeGame";
 import CountdownStopperGame from "../../features/games/countdown-stopper/CountdownStopperGame";
-import FortuneCookieGame from "../../features/games/fortune-cookie/FortuneCookieGame";
 import GiftCatcherGame from "../../features/games/gift-catcher/GiftCatcherGame";
 import SleighRunnerGame from "../../features/games/sleigh-runner/SleighRunnerGame";
 import SnowflakeClickerGame from "../../features/games/snowflake-clicker/SnowflakeClickerGame";
@@ -10,6 +9,7 @@ import TriviaGame from "../../features/games/trivia/TriviaGame";
 import { findGame } from "../../features/games/gameCatalog";
 import GameResultCard from "../../features/games/shared/GameResultCard";
 import { decodeGameResult, encodeGameResult } from "../../features/games/shared/gameShare";
+import { bestRecordManager, type BestRecords } from "../../features/games/shared/bestRecords";
 import type { GameId, GameResult } from "../../features/games/shared/types";
 
 export default function GamePage() {
@@ -22,10 +22,15 @@ export default function GamePage() {
     [encodedResult, game],
   );
   const [result, setResult] = useState<GameResult | null>(sharedResult);
+  const [bestRecords, setBestRecords] = useState<BestRecords>(() => game ? bestRecordManager.get(game.id) : emptyBestRecords());
 
   useEffect(() => {
     setResult(sharedResult);
   }, [routeGameId, sharedResult]);
+
+  useEffect(() => {
+    setBestRecords(game ? bestRecordManager.get(game.id) : emptyBestRecords());
+  }, [routeGameId, game]);
 
   if (!game) {
     return (
@@ -41,6 +46,7 @@ export default function GamePage() {
   if (game.id === "tree-decorator") return <TreeGame />;
 
   function completeGame(nextResult: GameResult) {
+    setBestRecords(bestRecordManager.record(nextResult));
     setResult(nextResult);
     setSearchParams({ result: encodeGameResult(nextResult) }, { replace: true });
   }
@@ -60,7 +66,7 @@ export default function GamePage() {
       </div>
       <div className="game-play-surface">
         {result ? (
-          <GameResultCard result={result} onReplay={replay} />
+          <GameResultCard result={result} bestRecords={bestRecords} onReplay={replay} />
         ) : (
           <GameInstance gameId={game.id} onComplete={completeGame} />
         )}
@@ -75,7 +81,10 @@ function GameInstance({ gameId, onComplete }: { gameId: Exclude<GameId, "tree-de
     case "snowflake-clicker": return <SnowflakeClickerGame onComplete={onComplete} />;
     case "countdown-stopper": return <CountdownStopperGame onComplete={onComplete} />;
     case "sleigh-runner": return <SleighRunnerGame onComplete={onComplete} />;
-    case "fortune-cookie": return <FortuneCookieGame onComplete={onComplete} />;
     case "trivia": return <TriviaGame onComplete={onComplete} />;
   }
+}
+
+function emptyBestRecords(): BestRecords {
+  return { sessionBest: null, deviceBest: null };
 }

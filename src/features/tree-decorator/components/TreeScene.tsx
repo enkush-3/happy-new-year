@@ -12,8 +12,9 @@ interface TreeSceneProps {
   penColor: TreePenColor;
   penWidth: TreePenWidth;
   svgRef: RefObject<SVGSVGElement | null>;
-  onPlace: (x: number, y: number) => void;
-  onMove: (id: string, x: number, y: number) => void;
+  onPlace: (x: number, y: number, angle?: number) => void;
+  onMove: (id: string, x: number, y: number, angle?: number) => void;
+  onMoveCommit: () => void;
   onSelect: (id: string) => void;
   onRemove: (id: string) => void;
   onDraw: (stroke: TreeStroke) => void;
@@ -26,14 +27,6 @@ const labels: Record<OrnamentKind, string> = {
   "bauble-green": "Ногоон бөмбөлөг",
   "candy-cane": "Чихэрэн таяг",
   star: "Алтан од",
-};
-
-const colors: Record<OrnamentKind, string> = {
-  "bauble-red": "#d96b5e",
-  "bauble-gold": "#f2c96e",
-  "bauble-green": "#a8c989",
-  "candy-cane": "#f4e7ce",
-  star: "#ffd978",
 };
 
 const penColors: Record<TreePenColor, string> = {
@@ -111,6 +104,7 @@ export default function TreeScene({
   svgRef,
   onPlace,
   onMove,
+  onMoveCommit,
   onSelect,
   onRemove,
   onDraw,
@@ -192,6 +186,7 @@ export default function TreeScene({
     }
     if (draggingId.current) {
       draggingId.current = null;
+      onMoveCommit();
       window.setTimeout(() => {
         suppressPlacementClick.current = false;
       }, 0);
@@ -201,6 +196,7 @@ export default function TreeScene({
   function handlePointerCancel(event: PointerEvent<SVGSVGElement>) {
     if (draggingId.current) {
       draggingId.current = null;
+      onMoveCommit();
       suppressPlacementClick.current = false;
     }
     if (activePointerId.current !== event.pointerId) return;
@@ -291,7 +287,10 @@ export default function TreeScene({
   }
 
   function handleDecorationPointerUp() {
-    draggingId.current = null;
+    if (draggingId.current) {
+      draggingId.current = null;
+      onMoveCommit();
+    }
     window.setTimeout(() => {
       suppressPlacementClick.current = false;
     }, 0);
@@ -321,6 +320,7 @@ export default function TreeScene({
         ? clampToCanvas(decoration.x + nudge[0], decoration.y + nudge[1])
         : clampToTree(decoration.x + nudge[0], decoration.y + nudge[1]);
       onMove(decoration.id, point.x, point.y);
+      onMoveCommit();
     }
   }
 
@@ -425,7 +425,7 @@ export default function TreeScene({
       {design.decorations.map((decoration) => (
         <g
           key={decoration.id}
-          transform={`translate(${decoration.x * 400} ${decoration.y * 560})`}
+          transform={`translate(${decoration.x * 400} ${decoration.y * 560}) rotate(${decoration.rotation}) scale(${decoration.scale})`}
           role="button"
           aria-label={`Модон дээрх ${labels[decoration.kind]}`}
           aria-pressed={selectedDecorationId === decoration.id}
@@ -448,18 +448,18 @@ export default function TreeScene({
             {decoration.kind === "star" ? (
               <>
                 <circle r="23" fill="#f8d274" fillOpacity=".18" />
-                <polygon points={starPoints(17, 8)} fill={colors[decoration.kind]} stroke="#fff0b8" strokeWidth="2" strokeLinejoin="round" />
+                <polygon points={starPoints(17, 8)} fill={decoration.color} stroke="#fff0b8" strokeWidth="2" strokeLinejoin="round" />
               </>
             ) : decoration.kind === "candy-cane" ? (
               <>
                 <path d="M-8 11v-17a9 9 0 0 1 18 0v5" fill="none" stroke="#fff3dc" strokeWidth="13" strokeLinecap="round" />
-                <path d="M-8 11v-17a9 9 0 0 1 18 0v5" fill="none" stroke="#d76b5d" strokeWidth="5" strokeDasharray="5 6" strokeLinecap="round" />
+                <path d="M-8 11v-17a9 9 0 0 1 18 0v5" fill="none" stroke={decoration.color} strokeWidth="5" strokeDasharray="5 6" strokeLinecap="round" />
                 <path d="M-13 12h10" stroke="#e7c875" strokeWidth="3" strokeLinecap="round" />
               </>
             ) : (
               <>
                 <path d="M-5-13v-8h10v8" fill="#dfbd7c" stroke="#f4e4b6" strokeWidth="2" />
-                <circle r="14" fill={colors[decoration.kind]} stroke="#fff0c0" strokeWidth="2.2" />
+                <circle r="14" fill={decoration.color} stroke="#fff0c0" strokeWidth="2.2" />
                 <ellipse cx="-5" cy="-5" rx="3.4" ry="5" fill="#fff" opacity=".46" />
                 <path d="M-7 15h14" stroke="#fff0c0" strokeWidth="2" strokeLinecap="round" />
               </>

@@ -4,6 +4,7 @@ import {
   addStroke,
   decodeTreeFragment,
   DEFAULT_TREE_DESIGN,
+  duplicateDecoration,
   encodeTreeFragment,
   MAX_DECORATIONS,
   MAX_POINTS_PER_STROKE,
@@ -11,6 +12,7 @@ import {
   moveDecoration,
   removeDecoration,
   removeStroke,
+  transformDecoration,
   type TreeDecoration,
   type TreeDesign,
   type TreeStroke,
@@ -21,6 +23,10 @@ const ornament = (id: string, x = 0.5, y = 0.5): TreeDecoration => ({
   kind: "bauble-red",
   x,
   y,
+  angle: Math.round((0.5 + (x - 0.5) * 0.8) * 1000) / 1000,
+  rotation: 0,
+  scale: 1,
+  color: "#d96b5e",
 });
 
 describe("tree design state", () => {
@@ -40,7 +46,7 @@ describe("tree design state", () => {
 
   it("round-trips a custom tree drawing and ornaments through a share fragment", () => {
     const design: TreeDesign = {
-      version: 2,
+      version: 3,
       treeMode: "custom",
       decorations: [ornament("bauble", 0.4, 0.5)],
       strokes: [{
@@ -55,6 +61,37 @@ describe("tree design state", () => {
 
     expect(fragment.length).toBeLessThan(4096);
     expect(decodeTreeFragment(fragment)).toEqual({ design, valid: true });
+  });
+
+  it("round-trips 3D ornament edits through the next share format", () => {
+    const editedDecoration = {
+      ...ornament("edited-star", 0.55, 0.3),
+      angle: 0.63,
+      rotation: 42,
+      scale: 1.4,
+      color: "#98d8f2",
+    } as unknown as TreeDecoration;
+    const design = { ...DEFAULT_TREE_DESIGN, decorations: [editedDecoration] };
+    const restored = decodeTreeFragment(encodeTreeFragment(design));
+
+    expect(restored.valid).toBe(true);
+    expect(restored.design.decorations[0]).toMatchObject({
+      angle: 0.63,
+      rotation: 42,
+      scale: 1.4,
+      color: "#98d8f2",
+    });
+  });
+
+  it("updates and duplicates an ornament with bounded editor controls", () => {
+    const design = { ...DEFAULT_TREE_DESIGN, decorations: [ornament("star", 0.5, 0.32)] };
+    const transformed = transformDecoration(design, "star", { rotation: 35, scale: 1.4, color: "#98d8f2" });
+    const duplicated = duplicateDecoration(transformed, "star", "star-copy");
+
+    expect(transformed.decorations[0]).toMatchObject({ rotation: 35, scale: 1.4, color: "#98d8f2" });
+    expect(duplicated.decorations).toHaveLength(2);
+    expect(duplicated.decorations[1].id).toBe("star-copy");
+    expect(duplicated.decorations[1].x).not.toBe(duplicated.decorations[0].x);
   });
 
   it("round-trips the maximum-length stroke through a share fragment", () => {
@@ -81,13 +118,49 @@ describe("tree design state", () => {
 
     expect(decodeTreeFragment(legacy)).toEqual({
       design: {
-        version: 2,
+        version: 3,
         treeMode: "classic",
-        decorations: [{ id: "legacy-star", kind: "star", x: 0.5, y: 0.3 }],
+        decorations: [{
+          id: "legacy-star", kind: "star", x: 0.5, y: 0.3,
+          angle: 0.5, rotation: 0, scale: 1, color: "#ffd978",
+        }],
         strokes: [],
       },
       valid: true,
     });
+  });
+
+  it("migrates previous v2 links into the 3D editor model", () => {
+    const legacyBase64 = btoa(JSON.stringify({
+      v: 2,
+      m: "p",
+      d: [["old-bauble", "r", 600, 400]],
+      s: [],
+    })).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
+    const restored = decodeTreeFragment(`#tree=${legacyBase64}`);
+
+    expect(restored.valid).toBe(true);
+    expect(restored.design.version).toBe(3);
+    expect(restored.design.decorations[0]).toMatchObject({
+      id: "old-bauble", kind: "bauble-red", x: 0.6, y: 0.4,
+      angle: 0.58, rotation: 0, scale: 1, color: "#d96b5e",
+    });
+  });
+
+  it.each([
+    [1, { v: 1, d: [["crafted", "constructor", 500, 300]] }],
+    [1, { v: 1, d: [["crafted", "toString", 500, 300]] }],
+    [2, { v: 2, m: "p", d: [["crafted", "constructor", 500, 300]], s: [] }],
+    [2, { v: 2, m: "p", d: [["crafted", "toString", 500, 300]], s: [] }],
+    [3, { v: 3, m: "p", d: [["crafted", "constructor", 500, 300, 500, 0, 100, "r"]], s: [] }],
+    [3, { v: 3, m: "p", d: [["crafted", "r", 500, 300, 500, 0, 100, "constructor"]], s: [] }],
+    [3, { v: 3, m: "p", d: [["crafted", "r", 500, 300, 500, 0, 100, "toString"]], s: [] }],
+    [2, { v: 2, m: "c", d: [], s: [["ink", "constructor", 1, "AAEAAQ"]] }],
+    [2, { v: 2, m: "c", d: [], s: [["ink", "toString", 1, "AAEAAQ"]] }],
+  ] as const)("rejects inherited lookup codes from crafted v%s share data", (_version, payload) => {
+    const encoded = btoa(JSON.stringify(payload)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
+
+    expect(decodeTreeFragment(`#tree=${encoded}`)).toEqual({ design: DEFAULT_TREE_DESIGN, valid: false });
   });
 
   it("rejects an unsupported number of freehand strokes", () => {

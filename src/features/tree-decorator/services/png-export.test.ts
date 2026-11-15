@@ -34,10 +34,11 @@ describe("tree image export", () => {
 
   it("rasterizes the SVG and starts a PNG download", async () => {
     const drawImage = vi.fn();
+    const fillRect = vi.fn();
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
       expect(this.download).toBe("happy-new-year-tree.png");
     });
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage, fillRect } as unknown as CanvasRenderingContext2D);
     vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) => {
       callback(new Blob(["png"], { type: "image/png" }));
     });
@@ -65,5 +66,51 @@ describe("tree image export", () => {
     expect(drawImage).toHaveBeenCalledTimes(1);
     expect(click).toHaveBeenCalledTimes(1);
     expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
+  });
+
+  it("contains the current 3D render canvas on a dark PNG background", async () => {
+    const drawImage = vi.fn();
+    const fillRect = vi.fn();
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage, fillRect } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) => {
+      callback(new Blob(["png"], { type: "image/png" }));
+    });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:tree-render");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    vi.spyOn(window, "setTimeout").mockImplementation((callback) => {
+      if (typeof callback === "function") callback();
+      return 1;
+    });
+    const renderCanvas = document.createElement("canvas");
+
+    await downloadTreePng(renderCanvas);
+
+    expect(fillRect).toHaveBeenCalledWith(0, 0, 1200, 1680);
+    expect(drawImage).toHaveBeenCalledWith(renderCanvas, 0, 540, 1200, 600);
+  });
+
+  it("contains a wide 3D canvas with dark padding instead of stretching it", async () => {
+    const drawImage = vi.fn();
+    const fillRect = vi.fn();
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage, fillRect } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) => {
+      callback(new Blob(["png"], { type: "image/png" }));
+    });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:tree-render");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    vi.spyOn(window, "setTimeout").mockImplementation((callback) => {
+      if (typeof callback === "function") callback();
+      return 1;
+    });
+    const renderCanvas = document.createElement("canvas");
+    renderCanvas.width = 1600;
+    renderCanvas.height = 800;
+
+    await downloadTreePng(renderCanvas);
+
+    expect(fillRect).toHaveBeenCalledWith(0, 0, 1200, 1680);
+    expect(drawImage).toHaveBeenCalledWith(renderCanvas, 0, 540, 1200, 600);
   });
 });

@@ -21,11 +21,12 @@ describe("Happy New Year game hub", () => {
     expect(screen.getByText(/хоног/)).toBeInTheDocument();
   });
 
-  it("lists all six new games and the existing tree decorator", () => {
+  it("lists the six public games, includes the tree decorator, and omits Fortune Cookie", () => {
     renderApp("/games");
 
     expect(screen.getByRole("heading", { name: "Тоглоомууд" })).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: /Тоглох/ })).toHaveLength(7);
+    expect(screen.getAllByRole("link", { name: /Тоглох/ })).toHaveLength(6);
+    expect(document.querySelector('a[href="/games/fortune-cookie"]')).toBeNull();
   });
 
   it("navigates from the header to the game library", async () => {

@@ -16,6 +16,7 @@ describe("Happy New Year tree builder", () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
     window.history.replaceState(null, "", "/");
+    window.localStorage.clear();
     vi.clearAllMocks();
   });
 
@@ -83,6 +84,75 @@ describe("Happy New Year tree builder", () => {
     fireEvent.pointerUp(tree, { pointerId: 1, clientX: 280, clientY: 360 });
 
     expect(ball.getAttribute("transform")).not.toBe(originalPosition);
+  });
+
+  it("commits an SVG ornament drag to share, reload, and undo state", async () => {
+    const user = userEvent.setup();
+    const view = render(<TreeGame />);
+    await user.click(screen.getByRole("button", { name: "2D зураг" }));
+    const tree = screen.getByRole("group", { name: "Чимэглэх гацуур" });
+    vi.spyOn(tree, "getBoundingClientRect").mockReturnValue({
+      x: 0, y: 0, left: 0, top: 0, right: 400, bottom: 560, width: 400, height: 560,
+      toJSON: () => ({}),
+    } as DOMRect);
+
+    await user.click(screen.getByRole("button", { name: "Улаан бөмбөлөг сонгох" }));
+    fireEvent.click(tree, { clientX: 200, clientY: 280 });
+    const ball = screen.getByRole("button", { name: "Модон дээрх Улаан бөмбөлөг" });
+    const originalTransform = ball.getAttribute("transform");
+    const before = decodeTreeFragment(window.location.hash).design.decorations[0];
+    fireEvent.pointerDown(ball, { pointerId: 41, button: 0, clientX: 200, clientY: 280 });
+    fireEvent.pointerMove(tree, { pointerId: 41, clientX: 280, clientY: 360 });
+    fireEvent.pointerUp(ball, { pointerId: 41, clientX: 280, clientY: 360 });
+
+    const shared = decodeTreeFragment(window.location.hash);
+    expect(shared.valid).toBe(true);
+    expect(shared.design.decorations[0].x).toBeGreaterThan(before.x);
+    expect(decodeTreeFragment(window.localStorage.getItem("happy-new-year:last-tree:v3") ?? "").design)
+      .toEqual(shared.design);
+
+    await user.click(screen.getByRole("button", { name: "Буцаах" }));
+    const undone = decodeTreeFragment(window.location.hash);
+    expect(undone.design.decorations[0].x).toBe(before.x);
+    expect(undone.design.decorations[0].y).toBe(before.y);
+    await user.click(screen.getByRole("button", { name: "Дахин хийх" }));
+    const movedTransform = screen.getByRole("button", { name: "Модон дээрх Улаан бөмбөлөг" }).getAttribute("transform");
+
+    view.unmount();
+    render(<TreeGame />);
+    expect(screen.getByRole("button", { name: "Модон дээрх Улаан бөмбөлөг" }).getAttribute("transform"))
+      .not.toBe(originalTransform);
+    expect(movedTransform).not.toBe(originalTransform);
+  });
+
+  it("edits, duplicates, and undoes a selected ornament", async () => {
+    const user = userEvent.setup();
+    render(<TreeGame />);
+    const tree = screen.getByRole("group", { name: "Чимэглэх гацуур" });
+
+    await user.click(screen.getByRole("button", { name: "Улаан бөмбөлөг сонгох" }));
+    fireEvent.click(tree, { clientX: 200, clientY: 280 });
+    await user.click(screen.getByRole("button", { name: "Томруулах" }));
+    await user.click(screen.getByRole("button", { name: "Мөсөн цэнхэр өнгө" }));
+
+    let design = decodeTreeFragment(window.location.hash).design;
+    expect(design.decorations[0]).toMatchObject({ scale: 1.1, color: "#98d8f2" });
+
+    await user.click(screen.getByRole("button", { name: "Хуулбарлах" }));
+    expect(decodeTreeFragment(window.location.hash).design.decorations).toHaveLength(2);
+    await user.click(screen.getByRole("button", { name: "Буцаах" }));
+    design = decodeTreeFragment(window.location.hash).design;
+    expect(design.decorations).toHaveLength(1);
+    expect(design.decorations[0]).toMatchObject({ scale: 1.1, color: "#98d8f2" });
+    await user.click(screen.getByRole("button", { name: "Дахин хийх" }));
+    expect(decodeTreeFragment(window.location.hash).design.decorations).toHaveLength(2);
+  });
+
+  it("keeps the editable 2D tree available when WebGL is unavailable", async () => {
+    render(<TreeGame />);
+
+    expect(screen.getByRole("group", { name: "Чимэглэх гацуур" })).toBeInTheDocument();
+    expect(await screen.findByText(/3D дүрслэл боломжгүй/i)).toBeInTheDocument();
   });
 
   it("does not place another ornament when tapping a placed ornament", async () => {
@@ -214,7 +284,10 @@ describe("Happy New Year tree builder", () => {
   it("restores a shared tree from the URL fragment", () => {
     const design: TreeDesign = {
       ...DEFAULT_TREE_DESIGN,
-      decorations: [{ id: "shared-star", kind: "star", x: 0.5, y: 0.3 }],
+      decorations: [{
+        id: "shared-star", kind: "star", x: 0.5, y: 0.3,
+        angle: 0.5, rotation: 0, scale: 1, color: "#ffd978",
+      }],
     };
     window.history.replaceState(null, "", `/${encodeTreeFragment(design)}`);
     render(<TreeGame />);

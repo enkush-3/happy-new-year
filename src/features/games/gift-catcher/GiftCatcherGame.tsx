@@ -31,6 +31,7 @@ const emptyGame: GameState = {
   hazardsHit: 0,
   lives: GIFT_CATCHER_STARTING_LIVES,
 };
+const simulationTickMs = 100;
 
 const objectIcons: Record<FallingObjectKind, string> = {
   gift: "🎁",
@@ -40,25 +41,53 @@ const objectIcons: Record<FallingObjectKind, string> = {
 
 export default function GiftCatcherGame({ onComplete }: GiftCatcherGameProps) {
   const [game, setGame] = useState<GameState>(emptyGame);
+  const gameRef = useRef(game);
+  gameRef.current = game;
   const nextObjectId = useRef(0);
+  const startedAt = useRef(0);
+  const lastElapsedMs = useRef(0);
+  const nextObjectAtMs = useRef(0);
+  const hiddenAt = useRef<number | null>(null);
   const resultSent = useRef(false);
 
   useEffect(() => {
     if (game.status !== "running") return;
 
-    const interval = window.setInterval(() => {
-      setGame((current) => {
-        if (current.status !== "running") return current;
-        const elapsedMs = Math.min(current.elapsedMs + 100, GIFT_CATCHER_DURATION_MS);
-        const objects = current.objects.map((item) => ({ ...item, y: item.y + 3.2 }));
-        if (elapsedMs % 700 === 0) objects.push(makeFallingObject(nextObjectId.current++));
-        const resolved = resolveCatches(current, objects, current.basketX);
-        const status = elapsedMs >= GIFT_CATCHER_DURATION_MS || resolved.state.lives <= 0 ? "finished" : "running";
-        return { ...current, ...resolved.state, elapsedMs, objects: resolved.remaining, status };
-      });
-    }, 100);
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        hiddenAt.current ??= Date.now();
+      } else if (hiddenAt.current !== null) {
+        startedAt.current += Date.now() - hiddenAt.current;
+        hiddenAt.current = null;
+      }
+    }
 
-    return () => window.clearInterval(interval);
+    if (document.visibilityState === "hidden") hiddenAt.current = Date.now();
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      const current = gameRef.current;
+      if (current.status !== "running") return;
+      const elapsedMs = Math.min(Math.max(0, Date.now() - startedAt.current), GIFT_CATCHER_DURATION_MS);
+      const deltaMs = Math.max(0, elapsedMs - lastElapsedMs.current);
+      lastElapsedMs.current = elapsedMs;
+      const objects = current.objects.map((item) => ({ ...item, y: item.y + 3.2 * deltaMs / simulationTickMs }));
+      while (elapsedMs >= nextObjectAtMs.current && elapsedMs < GIFT_CATCHER_DURATION_MS) {
+        objects.push(makeFallingObject(nextObjectId.current++));
+        nextObjectAtMs.current += 700;
+      }
+      const resolved = resolveCatches(current, objects, current.basketX);
+      const status: GameState["status"] = elapsedMs >= GIFT_CATCHER_DURATION_MS || resolved.state.lives <= 0 ? "finished" : "running";
+      const nextGame = { ...current, ...resolved.state, elapsedMs, objects: resolved.remaining, status };
+      gameRef.current = nextGame;
+      setGame(nextGame);
+    }, simulationTickMs);
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      hiddenAt.current = null;
+    };
   }, [game.status]);
 
   useEffect(() => {
@@ -76,7 +105,13 @@ export default function GiftCatcherGame({ onComplete }: GiftCatcherGameProps) {
   function startGame() {
     resultSent.current = false;
     nextObjectId.current = 0;
-    setGame({ ...emptyGame, status: "running" });
+    startedAt.current = Date.now();
+    lastElapsedMs.current = 0;
+    nextObjectAtMs.current = 700;
+    hiddenAt.current = null;
+    const nextGame = { ...emptyGame, status: "running" as const };
+    gameRef.current = nextGame;
+    setGame(nextGame);
   }
 
   function onArenaKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -128,7 +163,7 @@ export default function GiftCatcherGame({ onComplete }: GiftCatcherGameProps) {
           <span
             key={item.id}
             className={`gift-catcher__falling gift-catcher__falling--${item.kind}`}
-            style={{ left: `${item.x}%`, top: `${item.y}%` }}
+            style={{ left: `${item.x}%`, top: `${item.y}%`, transition: "top 100ms linear" }}
             aria-hidden="true"
             data-testid={`falling-${item.kind}`}
           >{objectIcons[item.kind]}</span>

@@ -25,18 +25,28 @@ export function serializeTreeSvg(svg: SVGSVGElement): Blob {
   });
 }
 
-export async function downloadTreePng(svg: SVGSVGElement | null): Promise<void> {
-  if (!svg) throw new Error("Гацуурын зураг олдсонгүй.");
+export async function downloadTreePng(source: SVGSVGElement | HTMLCanvasElement | null): Promise<void> {
+  if (!source) throw new Error("Гацуурын зураг олдсонгүй.");
 
-  const svgUrl = URL.createObjectURL(serializeTreeSvg(svg));
+  const svgUrl = source.tagName.toLowerCase() === "svg"
+    ? URL.createObjectURL(serializeTreeSvg(source as SVGSVGElement))
+    : null;
   try {
-    const image = await loadImage(svgUrl);
     const canvas = document.createElement("canvas");
     canvas.width = exportWidth;
     canvas.height = exportHeight;
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Зургийн canvas үүсгэж чадсангүй.");
-    context.drawImage(image, 0, 0, exportWidth, exportHeight);
+    context.fillStyle = "#10192d";
+    context.fillRect(0, 0, exportWidth, exportHeight);
+    if (svgUrl) {
+      const image = await loadImage(svgUrl);
+      context.drawImage(image, 0, 0, exportWidth, exportHeight);
+    } else {
+      const renderCanvas = source as HTMLCanvasElement;
+      const fitted = containCanvas(renderCanvas.width, renderCanvas.height);
+      context.drawImage(renderCanvas, fitted.x, fitted.y, fitted.width, fitted.height);
+    }
 
     const png = await canvasToBlob(canvas);
     const pngUrl = URL.createObjectURL(png);
@@ -49,8 +59,21 @@ export async function downloadTreePng(svg: SVGSVGElement | null): Promise<void> 
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(pngUrl), 1000);
   } finally {
-    URL.revokeObjectURL(svgUrl);
+    if (svgUrl) URL.revokeObjectURL(svgUrl);
   }
+}
+
+function containCanvas(width: number, height: number) {
+  if (width <= 0 || height <= 0) return { x: 0, y: 0, width: exportWidth, height: exportHeight };
+  const scale = Math.min(exportWidth / width, exportHeight / height);
+  const fittedWidth = width * scale;
+  const fittedHeight = height * scale;
+  return {
+    x: (exportWidth - fittedWidth) / 2,
+    y: (exportHeight - fittedHeight) / 2,
+    width: fittedWidth,
+    height: fittedHeight,
+  };
 }
 
 function loadImage(url: string): Promise<HTMLImageElement> {

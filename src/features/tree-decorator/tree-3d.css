@@ -1,0 +1,25 @@
+.tree-3d-shell { position: absolute; z-index: 1; inset: 0; overflow: hidden; outline: none; }
+.tree-3d-shell:focus-visible { box-shadow: inset 0 0 0 3px rgba(255, 222, 151, .78); }
+.tree-3d-shell.is-orbiting { cursor: grab; touch-action: none; }
+.tree-3d-shell.is-orbiting:active { cursor: grabbing; }
+.tree-3d-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.tree-3d-fallback { position: absolute; inset: 0; display: grid; place-items: center; }
+.tree-3d-status { position: absolute; z-index: 4; right: 12px; bottom: 12px; left: 12px; margin: 0; padding: 9px 13px; border: 1px solid rgba(230, 239, 255, .2); border-radius: 999px; color: #f8f2e6; background: rgba(11, 19, 32, .82); font-size: 12px; line-height: 1.4; text-align: center; pointer-events: none; }
+.tree-3d-instructions { position: absolute; right: 14px; bottom: 14px; left: 14px; padding: 8px 12px; border-radius: 999px; color: #f7f0e2; background: rgba(11, 19, 32, .56); font-size: 11px; text-align: center; pointer-events: none; }
+.tree-view-switch { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
+.tree-view-switch .tool-chip { flex: 1; }
+.tree-editor-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 13px; }
+.tree-editor-colors { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 15px; }
+.tree-editor-color { width: 26px; height: 26px; border: 2px solid rgba(235, 241, 250, .5); border-radius: 50%; background: var(--tree-color); cursor: pointer; }
+.tree-editor-color.is-active { outline: 2px solid var(--tree-color); outline-offset: 3px; }
+.tree-placed-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
+.tree-placed-item { display: inline-flex; min-height: 34px; gap: 6px; align-items: center; padding: 5px 10px; border: 1px solid var(--md-sys-color-outline-variant); border-radius: 999px; color: var(--md-sys-color-on-surface-variant); background: var(--md-sys-color-surface-container-lowest); font-size: 11px; cursor: pointer; }
+.tree-placed-item.is-active { border-color: var(--md-sys-color-primary); color: var(--md-sys-color-on-secondary-container); background: var(--md-sys-color-secondary-container); }
+.tree-3d-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+@media (max-width: 640px) {
+  .tree-editor-controls { grid-template-columns: 1fr 1fr; }
+  .tree-3d-status { font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tree-3d-shell, .tree-3d-shell * { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}

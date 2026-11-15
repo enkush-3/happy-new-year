@@ -61,18 +61,18 @@ export default function CountdownStopperGame({ onComplete }: CountdownStopperGam
     <section className="mini-game countdown-stopper" aria-labelledby="countdown-stopper-title" tabIndex={0} onKeyDown={onGameKeyDown}>
       <header className="mini-game__header">
         <div>
-          <p className="mini-game__eyebrow">2D REACTION · 10 СЕКУНД</p>
+          <p className="mini-game__eyebrow">2D REACTION · 20.27 СЕКУНД</p>
           <h2 id="countdown-stopper-title">Яг цагт нь зогсоо</h2>
-          <p className="mini-game__description">Тооллыг 00:00.00-д аль болох ойр зогсоогоорой.</p>
+          <p className="mini-game__description">Хугацааг 00.00-ээс эхлүүлээд 20.27 секундэд аль болох ойр зогсоогоорой.</p>
         </div>
-        <span className="countdown-stopper__target">Зорилт <b>00:00.00</b></span>
+        <span className="countdown-stopper__target">Зорилт <b>20.270 сек</b></span>
       </header>
 
       <div className={`countdown-stopper__dial${status === "running" ? " is-running" : ""}`}>
-        <span className="countdown-stopper__label">ҮЛДСЭН ХУГАЦАА</span>
+        <span className="countdown-stopper__label">ӨНГӨРСӨН ХУГАЦАА</span>
         <strong data-testid="stopper-display" aria-live="off">{formatStopperTime(elapsedMs)}</strong>
         <span className="countdown-stopper__unit">секунд</span>
-        <div className="countdown-stopper__track" aria-hidden="true"><span style={{ transform: `scaleX(${Math.max(0, 1 - elapsedMs / COUNTDOWN_STOPPER_TARGET_MS)})` }} /></div>
+        <div className="countdown-stopper__track" aria-hidden="true"><span style={{ transform: `scaleX(${Math.min(1, elapsedMs / COUNTDOWN_STOPPER_TARGET_MS)})` }} /></div>
       </div>
 
       <div className="countdown-stopper__action">
@@ -85,11 +85,11 @@ export default function CountdownStopperGame({ onComplete }: CountdownStopperGam
 
       {result && (
         <div className="countdown-stopper__result" role="status" aria-live="polite">
-          <strong>{result.deviationMs === 0 ? "Яг оноолоо!" : `${(result.deviationMs / 1_000).toFixed(3)} сек зөрлөө`}</strong>
-          <span>{result.score} оноо</span>
+          <strong>{result.deviationMs === 0 ? "Яг оноолоо!" : `${result.deviationMs} мс зөрлөө`}</strong>
+          <span>{(result.elapsedMs / 1_000).toFixed(3)} сек · {result.score} оноо</span>
         </div>
       )}
-      <p className="mini-game__hint">10.00 секундээс тоолно. Space эсвэл товчийг дарж зогсооно.</p>
+      <p className="mini-game__hint">0.00-ээс дээш тоолно. Space эсвэл товчийг дарж 20.270 секундэд зогсооно.</p>
     </section>
   );
 }

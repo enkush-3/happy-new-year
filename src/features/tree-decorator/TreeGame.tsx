@@ -1,15 +1,19 @@
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import TreeScene, { clampToTree, treeCanvasPointFromClient, treePointFromClient, type TreeTool } from "./components/TreeScene";
+import Tree3DScene from "./components/Tree3DScene";
 import {
   addDecoration,
   addStroke,
   decodeTreeFragment,
   DEFAULT_TREE_DESIGN,
+  duplicateDecoration,
   encodeTreeFragment,
   MAX_DECORATIONS,
   moveDecoration,
   removeDecoration,
   removeStroke,
+  transformDecoration,
+  type OrnamentColor,
   type OrnamentKind,
   type TreeDesign,
   type TreePenColor,
@@ -17,11 +21,12 @@ import {
   type TreeStroke,
 } from "./model/tree-state";
 import { downloadTreePng } from "./services/png-export";
+import { loadLastTreeDesign, saveLastTreeDesign } from "./model/tree-storage";
 
 const palette: { kind: OrnamentKind; label: string; icon: string; color: string }[] = [
   { kind: "bauble-red", label: "Улаан бөмбөлөг", icon: "●", color: "#d96b5e" },
   { kind: "bauble-gold", label: "Алтан бөмбөлөг", icon: "●", color: "#f2c96e" },
-  { kind: "bauble-green", label: "Ногоон бөмбөлөг", icon: "●", color: "#b4d6ae" },
+  { kind: "bauble-green", label: "Ногоон бөмбөлөг", icon: "●", color: "#a8c989" },
   { kind: "candy-cane", label: "Чихэрэн таяг", icon: "♧", color: "#f4e7ce" },
   { kind: "star", label: "Алтан од", icon: "✦", color: "#ffd978" },
 ];
@@ -33,17 +38,37 @@ const drawingColors: { color: TreePenColor; label: string; value: string }[] = [
   { color: "ice", label: "Мөсөн цэнхэр", value: "#98d8f2" },
 ];
 const drawingWidths: TreePenWidth[] = [5, 8, 12];
-const stageSnowflakeCount = 18;
+const stageSnowflakeCount = 10;
+const ornamentEditorColors: { color: OrnamentColor; label: string }[] = [
+  { color: "#d96b5e", label: "Улаан" },
+  { color: "#f2c96e", label: "Алтлаг" },
+  { color: "#a8c989", label: "Ногоон" },
+  { color: "#f4e7ce", label: "Цагаан" },
+  { color: "#ffd978", label: "Шар" },
+  { color: "#98d8f2", label: "Мөсөн цэнхэр" },
+  { color: "#d58bea", label: "Нил ягаан" },
+];
 
 export default function TreeGame() {
-  const [initialShare] = useState(() => decodeTreeFragment(window.location.hash));
+  const [initialShare] = useState(() => {
+    const hash = window.location.hash;
+    const shared = decodeTreeFragment(hash);
+    if (hash.includes("tree=")) return shared;
+    return { ...shared, design: loadLastTreeDesign() ?? shared.design };
+  });
   const [design, setDesign] = useState<TreeDesign>(initialShare.design);
+  const designRef = useRef(design);
+  designRef.current = design;
   const [selectedKind, setSelectedKind] = useState<OrnamentKind | null>(null);
   const [selectedDecorationId, setSelectedDecorationId] = useState<string | null>(null);
   const [drawingTool, setDrawingTool] = useState<TreeTool>(initialShare.design.treeMode === "custom" ? "draw" : "decorate");
+  const [viewMode, setViewMode] = useState<"3d" | "2d">("3d");
+  const [cameraMode, setCameraMode] = useState<"edit" | "orbit">("edit");
   const [penColor, setPenColor] = useState<TreePenColor>("snow");
   const [penWidth, setPenWidth] = useState<TreePenWidth>(8);
-  const [strokeHistory, setStrokeHistory] = useState<TreeStroke[][]>([]);
+  const [history, setHistory] = useState<{ past: TreeDesign[]; future: TreeDesign[] }>({ past: [], future: [] });
+  const historyRef = useRef(history);
+  historyRef.current = history;
   const [notice, setNotice] = useState(
     initialShare.valid ? "" : "Хуваалцсан модны линк буруу байна. Шинэ модноос эхэллээ.",
   );
@@ -51,8 +76,14 @@ export default function TreeGame() {
   const [showShareLink, setShowShareLink] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const treeRef = useRef<SVGSVGElement>(null);
+  const threeCanvasRef = useRef<HTMLCanvasElement>(null);
+  const pendingMoveBeforeRef = useRef<TreeDesign | null>(null);
+  const persistedFragmentRef = useRef<string | null>(null);
   const paletteDrag = useRef<{ kind: OrnamentKind; pointerId: number; x: number; y: number } | null>(null);
   const suppressTreeClick = useRef(false);
+  const handleCanvas = useCallback((canvas: HTMLCanvasElement | null) => {
+    threeCanvasRef.current = canvas;
+  }, []);
 
   useEffect(() => {
     function finishPaletteDrag(event: PointerEvent) {
@@ -62,10 +93,12 @@ export default function TreeGame() {
 
       const distance = Math.hypot(event.clientX - drag.x, event.clientY - drag.y);
       const svg = treeRef.current;
-      const bounds = svg?.getBoundingClientRect();
+      const canvas = threeCanvasRef.current;
+      const target = svg ?? canvas;
+      const bounds = target?.getBoundingClientRect();
       if (
         distance < 8 ||
-        !svg ||
+        !target ||
         !bounds ||
         event.clientX < bounds.left ||
         event.clientX > bounds.right ||
@@ -75,10 +108,17 @@ export default function TreeGame() {
         return;
       }
 
-      const point = design.treeMode === "custom"
-        ? treeCanvasPointFromClient(svg, event.clientX, event.clientY)
-        : treePointFromClient(svg, event.clientX, event.clientY);
-      placeDecoration(drag.kind, point.x, point.y);
+      if (svg) {
+        const point = design.treeMode === "custom"
+          ? treeCanvasPointFromClient(svg, event.clientX, event.clientY)
+          : treePointFromClient(svg, event.clientX, event.clientY);
+        placeDecoration(drag.kind, point.x, point.y);
+      } else if (canvas && bounds) {
+        const xRatio = (event.clientX - bounds.left) / bounds.width;
+        const yRatio = (event.clientY - bounds.top) / bounds.height;
+        const x = 0.5 + (xRatio - 0.5) * 0.65;
+        placeDecoration(drag.kind, x, 0.16 + yRatio * 0.66, 0.5 + (xRatio - 0.5) * 0.72);
+      }
       suppressTreeClick.current = true;
       window.setTimeout(() => {
         suppressTreeClick.current = false;
@@ -98,45 +138,109 @@ export default function TreeGame() {
   }, [design]);
 
   useEffect(() => {
-    const fragment = encodeTreeFragment(design);
-    window.history.replaceState(
-      null,
-      "",
-      `${window.location.pathname}${fragment}`,
-    );
+    if (pendingMoveBeforeRef.current) return;
+    persistDesign(design);
   }, [design]);
 
-  const selectedLabel = palette.find((item) => item.kind === selectedKind)?.label;
+  function persistDesign(nextDesign: TreeDesign) {
+    const fragment = encodeTreeFragment(nextDesign);
+    if (persistedFragmentRef.current === fragment) return;
+    persistedFragmentRef.current = fragment;
+    saveLastTreeDesign(nextDesign);
+    window.history.replaceState(null, "", `${window.location.pathname}${fragment}`);
+  }
 
-  function placeDecoration(kind: OrnamentKind, x: number, y: number) {
-    if (design.decorations.length >= MAX_DECORATIONS) {
+  const selectedLabel = palette.find((item) => item.kind === selectedKind)?.label;
+  const selectedDecoration = design.decorations.find((item) => item.id === selectedDecorationId);
+
+  function pushHistory(snapshot: TreeDesign) {
+    const current = historyRef.current;
+    const next = { past: [...current.past.slice(-39), snapshot], future: [] };
+    historyRef.current = next;
+    setHistory(next);
+  }
+
+  function commitPendingMove() {
+    const previous = pendingMoveBeforeRef.current;
+    if (!previous) return;
+    pendingMoveBeforeRef.current = null;
+    pushHistory(previous);
+  }
+
+  function updateDesign(next: TreeDesign, record = true) {
+    const current = designRef.current;
+    if (next === current) return;
+    if (record) {
+      commitPendingMove();
+      pushHistory(current);
+    } else if (!pendingMoveBeforeRef.current) {
+      pendingMoveBeforeRef.current = current;
+    }
+    designRef.current = next;
+    setDesign(next);
+  }
+
+  function undoEdit() {
+    commitPendingMove();
+    const current = historyRef.current;
+    const previous = current.past[current.past.length - 1];
+    if (!previous) return;
+    const nextHistory = { past: current.past.slice(0, -1), future: [designRef.current, ...current.future] };
+    historyRef.current = nextHistory;
+    setHistory(nextHistory);
+    designRef.current = previous;
+    setDesign(previous);
+    setNotice("Сүүлчийн засварыг буцаалаа.");
+  }
+
+  function redoEdit() {
+    const current = historyRef.current;
+    const next = current.future[0];
+    if (!next) return;
+    const nextHistory = { past: [...current.past, designRef.current].slice(-40), future: current.future.slice(1) };
+    historyRef.current = nextHistory;
+    setHistory(nextHistory);
+    designRef.current = next;
+    setDesign(next);
+    setNotice("Буцаасан засварыг сэргээлээ.");
+  }
+
+  function placeDecoration(kind: OrnamentKind, x: number, y: number, angle?: number) {
+    if (designRef.current.decorations.length >= MAX_DECORATIONS) {
       setNotice("Мод 48 чимэглэлтэй боллоо. Дахин нэмэхийн тулд нэгийг нь устгаарай.");
       return;
     }
 
-    const point = design.treeMode === "custom" ? clampToCanvas(x, y) : clampToTree(x, y);
+    const point = designRef.current.treeMode === "custom" ? clampToCanvas(x, y) : clampToTree(x, y);
     const id = createId();
-    const nextDesign = addDecoration(design, { id, kind, ...point });
-    setDesign(nextDesign);
+    const itemColor = (palette.find((item) => item.kind === kind)?.color ?? "#ffd978") as OrnamentColor;
+    const nextDesign = addDecoration(designRef.current, {
+      id, kind, ...point,
+      angle: angle ?? Math.round((0.5 + (point.x - 0.5) * 0.8) * 1000) / 1000,
+      rotation: 0,
+      scale: 1,
+      color: itemColor,
+    });
+    updateDesign(nextDesign);
     setSelectedDecorationId(id);
     setNotice(`${palette.find((item) => item.kind === kind)?.label ?? "Чимэглэл"} модон дээр нэмэгдлээ.`);
   }
 
-  function placeSelected(x: number, y: number) {
+  function placeSelected(x: number, y: number, angle?: number) {
     if (!selectedKind) {
       setNotice("Эхлээд чимэглэл сонгоод модон дээр товшино уу.");
       return;
     }
-    placeDecoration(selectedKind, x, y);
+    placeDecoration(selectedKind, x, y, angle);
   }
 
-  function handleTreePlace(x: number, y: number) {
+  function handleTreePlace(x: number, y: number, angle?: number) {
     if (drawingTool !== "decorate") return;
     if (suppressTreeClick.current) {
       suppressTreeClick.current = false;
       return;
     }
-    placeSelected(x, y);
+    placeSelected(x, y, angle);
   }
 
   function startPaletteDrag(kind: OrnamentKind, event: ReactPointerEvent<HTMLButtonElement>) {
@@ -153,65 +257,73 @@ export default function TreeGame() {
     };
   }
 
-  function handleMove(id: string, x: number, y: number) {
-    const point = design.treeMode === "custom" ? clampToCanvas(x, y) : clampToTree(x, y);
-    setDesign((current) => moveDecoration(current, id, point.x, point.y));
+  function handleMove(id: string, x: number, y: number, angle?: number) {
+    const point = designRef.current.treeMode === "custom" ? clampToCanvas(x, y) : clampToTree(x, y);
+    updateDesign(moveDecoration(designRef.current, id, point.x, point.y, angle), false);
+  }
+
+  function handleMove3D(id: string, point: { x: number; y: number; angle: number }) {
+    updateDesign(moveDecoration(designRef.current, id, point.x, point.y, point.angle), false);
+  }
+
+  function handleMoveCommit() {
+    commitPendingMove();
+    persistDesign(designRef.current);
   }
 
   function chooseTreeMode(treeMode: TreeDesign["treeMode"]) {
-    setDesign((current) => ({ ...current, treeMode }));
+    updateDesign({ ...designRef.current, treeMode });
     setDrawingTool(treeMode === "custom" ? "draw" : "decorate");
     setSelectedKind(null);
     setSelectedDecorationId(null);
     setNotice(treeMode === "custom" ? "Сойзоор модоо зурна уу." : "Бэлэн гацуураа чимэглээрэй.");
   }
 
-  function rememberStrokes() {
-    setStrokeHistory((history) => [...history.slice(-19), design.strokes]);
-  }
-
   function handleDraw(stroke: TreeStroke) {
-    const nextDesign = addStroke(design, stroke);
-    if (nextDesign === design) {
+    const nextDesign = addStroke(designRef.current, stroke);
+    if (nextDesign === designRef.current) {
       setNotice("Зураасны хязгаарт хүрлээ. Нэг зураас устгаад дахин оролдоно уу.");
       return;
     }
-    rememberStrokes();
-    setDesign(nextDesign);
+    updateDesign(nextDesign);
   }
 
   function handleEraseStroke(id: string) {
-    const nextDesign = removeStroke(design, id);
-    if (nextDesign === design) return;
-    rememberStrokes();
-    setDesign(nextDesign);
+    const nextDesign = removeStroke(designRef.current, id);
+    if (nextDesign === designRef.current) return;
+    updateDesign(nextDesign);
     setNotice("Зураасыг баллуурдлаа. Хүсвэл буцааж болно.");
-  }
-
-  function undoDrawing() {
-    const previousStrokes = strokeHistory[strokeHistory.length - 1];
-    if (!previousStrokes) return;
-    setDesign((current) => ({ ...current, strokes: previousStrokes }));
-    setStrokeHistory((history) => history.slice(0, -1));
-    setNotice("Сүүлчийн зургийг буцаалаа.");
   }
 
   function clearDrawing() {
     if (!design.strokes.length) return;
-    rememberStrokes();
-    setDesign((current) => ({ ...current, strokes: [] }));
+    updateDesign({ ...designRef.current, strokes: [] });
     setNotice("Өөрийн зурсан зурааснуудыг арилгалаа.");
   }
 
   function handleRemove(id: string) {
-    setDesign((current) => removeDecoration(current, id));
+    updateDesign(removeDecoration(designRef.current, id));
     setSelectedDecorationId((current) => (current === id ? null : current));
     setNotice("Чимэглэлийг модноос авлаа.");
   }
 
+  function transformSelected(transform: Parameters<typeof transformDecoration>[2], message: string) {
+    if (!selectedDecorationId) return;
+    updateDesign(transformDecoration(designRef.current, selectedDecorationId, transform));
+    setNotice(message);
+  }
+
+  function duplicateSelected() {
+    if (!selectedDecorationId) return;
+    const id = createId();
+    updateDesign(duplicateDecoration(designRef.current, selectedDecorationId, id));
+    setSelectedDecorationId(id);
+    setNotice("Чимэглэлийг хуулбарлалаа.");
+  }
+
   function resetTree() {
-    setDesign(DEFAULT_TREE_DESIGN);
-    setStrokeHistory([]);
+    updateDesign(DEFAULT_TREE_DESIGN);
+    pendingMoveBeforeRef.current = null;
     setSelectedKind(null);
     setSelectedDecorationId(null);
     setDrawingTool("decorate");
@@ -269,10 +381,11 @@ export default function TreeGame() {
   }
 
   async function savePng() {
-    if (!treeRef.current) return;
+    const source = threeCanvasRef.current ?? treeRef.current;
+    if (!source) return;
     setIsDownloading(true);
     try {
-      await downloadTreePng(treeRef.current);
+      await downloadTreePng(source);
       setNotice("Таны модны зураг бэлэн боллоо.");
     } catch {
       setNotice("Зураг үүсгэж чадсангүй. Дахин оролдоно уу.");
@@ -321,7 +434,8 @@ export default function TreeGame() {
         ))}
       </div>
       <div className="edit-buttons drawing-actions">
-        <button className="button button--quiet" type="button" onClick={undoDrawing} disabled={!strokeHistory.length} aria-label="Сүүлчийн зурсан зураасыг буцаах">Буцаах</button>
+        <button className="button button--quiet" type="button" onClick={undoEdit} disabled={!history.past.length} aria-label="Сүүлчийн зурсан зураасыг буцаах">Буцаах</button>
+        <button className="button button--quiet" type="button" onClick={redoEdit} disabled={!history.future.length}>Дахин хийх</button>
         <button className="button button--quiet" type="button" onClick={clearDrawing} disabled={!design.strokes.length}>Бүгдийг арилгах</button>
       </div>
       <p className="tool-hint"><span aria-hidden="true">✦</span> Өнгөө сонгоод модны мөчир, хэлбэрээ зурж болно.</p>
@@ -366,6 +480,14 @@ export default function TreeGame() {
             </button>
           </div>
 
+          {design.treeMode === "classic" && (
+            <div className="tree-view-switch" role="group" aria-label="Модны харагдац">
+              <button className={`tool-chip${viewMode === "3d" ? " is-active" : ""}`} type="button" aria-pressed={viewMode === "3d"} onClick={() => setViewMode("3d")}>3D мод</button>
+              <button className={`tool-chip${viewMode === "2d" ? " is-active" : ""}`} type="button" aria-pressed={viewMode === "2d"} onClick={() => setViewMode("2d")}>2D зураг</button>
+              {viewMode === "3d" && <button className={`tool-chip${cameraMode === "orbit" ? " is-active" : ""}`} type="button" aria-pressed={cameraMode === "orbit"} onClick={() => setCameraMode(cameraMode === "orbit" ? "edit" : "orbit")}>Модоо эргүүлж харах</button>}
+            </div>
+          )}
+
           {drawingPanel}
 
           <div className="tree-stage">
@@ -373,20 +495,52 @@ export default function TreeGame() {
             <div className="stage-snow stage-snow--one" aria-hidden="true" />
             <div className="stage-snow stage-snow--two" aria-hidden="true" />
             <div className="tree-stage__ground" aria-hidden="true" />
-            <TreeScene
-              design={design}
-              selectedDecorationId={selectedDecorationId}
-              drawingTool={drawingTool}
-              penColor={penColor}
-              penWidth={penWidth}
-              svgRef={treeRef}
-              onPlace={handleTreePlace}
-              onMove={handleMove}
-              onSelect={setSelectedDecorationId}
-              onRemove={handleRemove}
-              onDraw={handleDraw}
-              onErase={handleEraseStroke}
-            />
+            {design.treeMode === "classic" && viewMode === "3d" ? (
+              <Tree3DScene
+                design={design}
+                selectedDecorationId={selectedDecorationId}
+                selectedKind={selectedKind}
+                viewMode={cameraMode}
+                onCanvas={handleCanvas}
+                onPlace={(kind, point) => placeDecoration(kind, point.x, point.y, point.angle)}
+                onMove={handleMove3D}
+                onMoveCommit={handleMoveCommit}
+                onSelect={setSelectedDecorationId}
+                fallback={(
+                  <TreeScene
+                    design={design}
+                    selectedDecorationId={selectedDecorationId}
+                    drawingTool={drawingTool}
+                    penColor={penColor}
+                    penWidth={penWidth}
+                    svgRef={treeRef}
+                    onPlace={handleTreePlace}
+                    onMove={handleMove}
+                    onMoveCommit={handleMoveCommit}
+                    onSelect={setSelectedDecorationId}
+                    onRemove={handleRemove}
+                    onDraw={handleDraw}
+                    onErase={handleEraseStroke}
+                  />
+                )}
+              />
+            ) : (
+              <TreeScene
+                design={design}
+                selectedDecorationId={selectedDecorationId}
+                drawingTool={drawingTool}
+                penColor={penColor}
+                penWidth={penWidth}
+                svgRef={treeRef}
+                onPlace={handleTreePlace}
+                onMove={handleMove}
+                onMoveCommit={handleMoveCommit}
+                onSelect={setSelectedDecorationId}
+                onRemove={handleRemove}
+                onDraw={handleDraw}
+                onErase={handleEraseStroke}
+              />
+            )}
             <div className="stage-fall" aria-hidden="true">
               {Array.from({ length: stageSnowflakeCount }, (_, index) => (
                 <i
@@ -450,6 +604,22 @@ export default function TreeGame() {
               ))}
             </div>
             <p className="tool-hint"><span aria-hidden="true">↳</span> Байрлуулсан чимэглэлээ модон дээр чирж хөдөлгөж болно.</p>
+            {design.decorations.length > 0 && (
+              <div className="tree-placed-list" role="group" aria-label="Модон дээрх чимэглэлүүд">
+                {design.decorations.map((decoration, index) => (
+                  <button
+                    key={decoration.id}
+                    className={`tree-placed-item${selectedDecorationId === decoration.id ? " is-active" : ""}`}
+                    type="button"
+                    aria-pressed={selectedDecorationId === decoration.id}
+                    onClick={() => setSelectedDecorationId(decoration.id)}
+                  >
+                    <span aria-hidden="true" style={{ color: decoration.color }}>●</span>
+                    {palette.find((item) => item.kind === decoration.kind)?.label ?? "Чимэглэл"} {index + 1}
+                  </button>
+                ))}
+              </div>
+            )}
           </section>
 
           <section className="tool-card action-card" aria-labelledby="action-title">
@@ -506,6 +676,33 @@ export default function TreeGame() {
                 Шинээр эхлэх
               </button>
             </div>
+            {selectedDecoration && (
+              <>
+                <div className="tree-editor-controls" aria-label="Сонгосон чимэглэлийн тохиргоо">
+                  <button className="button button--quiet" type="button" onClick={duplicateSelected} disabled={design.decorations.length >= MAX_DECORATIONS}>Хуулбарлах</button>
+                  <button className="button button--quiet" type="button" onClick={() => transformSelected({ rotation: wrapDegrees(selectedDecoration.rotation + 15) }, "Чимэглэлийг эргүүллээ.")}>↻ 15°</button>
+                  <button className="button button--quiet" type="button" onClick={() => transformSelected({ scale: Math.min(1.6, selectedDecoration.scale + 0.1) }, "Чимэглэлийг томрууллаа.")} disabled={selectedDecoration.scale >= 1.6}>Томруулах</button>
+                  <button className="button button--quiet" type="button" onClick={() => transformSelected({ scale: Math.max(0.6, selectedDecoration.scale - 0.1) }, "Чимэглэлийг жижгэрүүллээ.")} disabled={selectedDecoration.scale <= 0.6}>Жижигрүүлэх</button>
+                </div>
+                <div className="tree-editor-colors" role="group" aria-label="Чимэглэлийн өнгө">
+                  {ornamentEditorColors.map((item) => (
+                    <button
+                      key={item.color}
+                      className={`tree-editor-color${selectedDecoration.color === item.color ? " is-active" : ""}`}
+                      style={{ "--tree-color": item.color } as CSSProperties}
+                      type="button"
+                      aria-label={`${item.label} өнгө`}
+                      aria-pressed={selectedDecoration.color === item.color}
+                      onClick={() => transformSelected({ color: item.color }, `${item.label} өнгөөр сольлоо.`)}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+            <div className="edit-buttons">
+              <button className="button button--quiet" type="button" onClick={undoEdit} disabled={!history.past.length}>Буцаах</button>
+              <button className="button button--quiet" type="button" onClick={redoEdit} disabled={!history.future.length}>Дахин хийх</button>
+            </div>
             <p className="keyboard-hint">Сонгосон чимэглэлийг суман товчоор хөдөлгөж, Delete-ээр устгана.</p>
           </section>
         </aside>
@@ -524,4 +721,8 @@ function clampToCanvas(x: number, y: number) {
     x: Math.min(0.975, Math.max(0.025, x)),
     y: Math.min(0.92, Math.max(0.03, y)),
   };
+}
+
+function wrapDegrees(value: number) {
+  return ((value + 180) % 360 + 360) % 360 - 180;
 }
