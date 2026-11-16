@@ -562,39 +562,46 @@ function syncDecorations(runtime: Runtime, design: TreeDesign, selectedId: strin
     const slotId = getDecorationSlotId(decoration);
     const slot = TREE_SLOTS.find((item) => item.id === slotId);
     if (!slot) return;
-    const hanger = createHanger(decoration, runtime.THREE, slotId === "slot-0");
-    hanger.position.set(slot.position[0] + slot.normal[0] * 0.035, slot.position[1] + slot.normal[1] * 0.035, slot.position[2] + slot.normal[2] * 0.035);
+    const hanger = createHanger(decoration, runtime.THREE, slotId === "slot-0", slot.normal, decoration.id === selectedId);
+    hanger.position.set(slot.position[0] + slot.normal[0] * 0.075, slot.position[1] + slot.normal[1] * 0.075, slot.position[2] + slot.normal[2] * 0.075);
     hanger.userData.phase = Math.atan2(slot.position[0], slot.position[2]);
     hanger.userData.slotId = slotId;
-    if (decoration.id === selectedId) {
-      hanger.traverse((object) => {
-        const mesh = object as import("three").Mesh;
-        const materials = mesh.isMesh ? (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) : [];
-        materials.forEach((material) => {
-          const standard = material as import("three").MeshStandardMaterial;
-          standard.emissiveIntensity = 0.52;
-        });
-      });
-    }
     runtime.treeRoot.add(hanger);
     runtime.ornaments.set(decoration.id, hanger);
   });
 }
 
-function createHanger(decoration: TreeDecoration, THREE: ThreeModule, topper: boolean) {
+function createHanger(decoration: TreeDecoration, THREE: ThreeModule, topper: boolean, normal: readonly [number, number, number], selected: boolean) {
   const group = new THREE.Group();
   group.userData.decorationId = decoration.id;
   if (!topper) {
-    const hanger = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.055, 6), new THREE.MeshStandardMaterial({ color: 0xe9d9ae, roughness: 0.34, metalness: 0.72 }));
+    const hanger = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.055, 6), new THREE.MeshBasicMaterial({ color: 0xe9d9ae }));
     hanger.position.y = -0.055;
     group.add(hanger);
   }
   const ornament = createOrnamentMesh(decoration, THREE);
-  ornament.position.y = topper ? 0 : -0.115;
   ornament.userData.decorationId = decoration.id;
-  group.add(ornament);
+  if (selected) {
+    ornament.traverse((object) => {
+      const mesh = object as import("three").Mesh;
+      if (!mesh.isMesh) return;
+      (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach((material) => {
+        (material as import("three").MeshBasicMaterial).color.multiplyScalar(1.08);
+      });
+    });
+  }
+  const display = new THREE.Group();
+  display.position.y = topper ? 0 : -0.055;
+  if (!topper && (decoration.kind === "snowflake" || decoration.kind === "candy-cane")) {
+    // Blend the slot's radial normal toward the default camera so flat details
+    // remain recognizable at side slots instead of collapsing into thin slivers.
+    const facing = new THREE.Vector3(normal[0], normal[1], normal[2] + 0.65).normalize();
+    display.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), facing);
+  }
+  display.add(ornament);
+  group.add(display);
   if (decoration.kind === "bell") {
-    const clapper = new THREE.Mesh(new THREE.SphereGeometry(0.025, 9, 7), new THREE.MeshStandardMaterial({ color: 0xffd978, roughness: 0.28, metalness: 0.35 }));
+    const clapper = new THREE.Mesh(new THREE.SphereGeometry(0.025, 9, 7), new THREE.MeshBasicMaterial({ color: 0xffd978 }));
     clapper.position.y = -0.21;
     group.add(clapper);
   }
@@ -602,27 +609,117 @@ function createHanger(decoration: TreeDecoration, THREE: ThreeModule, topper: bo
 }
 
 function createOrnamentMesh(decoration: TreeDecoration, THREE: ThreeModule) {
+  if (decoration.kind === "candy-cane") {
+    const cane = createCandyCane(THREE);
+    cane.scale.setScalar(decoration.scale);
+    cane.rotation.z = decoration.rotation * Math.PI / 180;
+    return cane;
+  }
   let geometry: import("three").BufferGeometry;
   switch (decoration.kind) {
     case "star": geometry = createStarGeometry(THREE); break;
-    case "candy-cane": geometry = new THREE.TorusGeometry(0.082, 0.027, 8, 18, Math.PI * 1.72); break;
-    case "snowflake": geometry = new THREE.OctahedronGeometry(0.115, 1); break;
+    case "snowflake": geometry = createSnowflakeGeometry(THREE); break;
     case "bell": geometry = new THREE.CylinderGeometry(0.05, 0.11, 0.14, 16, 1, false); break;
     default: geometry = new THREE.SphereGeometry(0.105, 18, 13); break;
   }
-  const material = new THREE.MeshStandardMaterial({ color: decoration.color, emissive: decoration.color, emissiveIntensity: 0.16, metalness: decoration.kind === "bauble-gold" || decoration.kind === "star" || decoration.kind === "bell" ? 0.46 : 0.12, roughness: 0.29, flatShading: decoration.kind === "star" || decoration.kind === "snowflake" });
+  const material = new THREE.MeshBasicMaterial({ color: decoration.color, vertexColors: true, side: THREE.DoubleSide });
+  geometry = withFacetColor(THREE, geometry);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.scale.setScalar(decoration.scale);
   mesh.rotation.z = decoration.rotation * Math.PI / 180;
-  if (decoration.kind === "snowflake") mesh.scale.set(0.72, 1.18, 0.55);
   if (decoration.kind === "bell") mesh.scale.set(0.85, 1.12, 0.85);
   return mesh;
+}
+
+function createCandyCane(THREE: ThreeModule) {
+  const group = new THREE.Group();
+  const curve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-0.035, -0.12, 0),
+    new THREE.Vector3(-0.008, -0.085, 0),
+    new THREE.Vector3(0, -0.025, 0),
+    new THREE.Vector3(0, 0.04, 0),
+    new THREE.Vector3(0.012, 0.085, 0),
+    new THREE.Vector3(0.043, 0.112, 0),
+    new THREE.Vector3(0.075, 0.096, 0),
+    new THREE.Vector3(0.075, 0.065, 0),
+  ]);
+  const base = new THREE.Mesh(
+    withFacetColor(THREE, new THREE.TubeGeometry(curve, 64, 0.022, 8, false)),
+    new THREE.MeshBasicMaterial({ color: "#f4e7ce", vertexColors: true }),
+  );
+  base.name = "Cream candy cane";
+  group.add(base);
+
+  const frameCount = 96;
+  const frames = curve.computeFrenetFrames(frameCount, false);
+  const stripePoints: import("three").Vector3[] = [];
+  for (let index = 0; index <= frameCount; index += 1) {
+    const progress = index / frameCount;
+    const angle = progress * Math.PI * 2 * 5;
+    const center = curve.getPointAt(progress);
+    const frame = frames.normals[index].clone().multiplyScalar(Math.cos(angle))
+      .addScaledVector(frames.binormals[index], Math.sin(angle));
+    stripePoints.push(center.addScaledVector(frame, 0.021));
+  }
+  const stripeCurve = new THREE.CatmullRomCurve3(stripePoints);
+  const stripe = new THREE.Mesh(
+    withFacetColor(THREE, new THREE.TubeGeometry(stripeCurve, frameCount, 0.0055, 5, false)),
+    new THREE.MeshBasicMaterial({ color: "#c84e49", vertexColors: true }),
+  );
+  stripe.name = "Candy cane red spiral";
+  group.add(stripe);
+  return group;
+}
+
+function createSnowflakeGeometry(THREE: ThreeModule) {
+  const positions: number[] = [];
+  const halfDepth = 0.009;
+  const addTriangle = (a: readonly number[], b: readonly number[], c: readonly number[]) => {
+    positions.push(...a, ...b, ...c);
+  };
+  const addSegment = (startX: number, startY: number, endX: number, endY: number, width: number) => {
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const length = Math.hypot(dx, dy) || 1;
+    const offsetX = (-dy / length) * width / 2;
+    const offsetY = (dx / length) * width / 2;
+    const front = [
+      [startX + offsetX, startY + offsetY, halfDepth],
+      [endX + offsetX, endY + offsetY, halfDepth],
+      [endX - offsetX, endY - offsetY, halfDepth],
+      [startX - offsetX, startY - offsetY, halfDepth],
+    ];
+    const back = front.map(([x, y]) => [x, y, -halfDepth]);
+    const [a, b, c, d] = front;
+    const [backA, backB, backC, backD] = back;
+    addTriangle(a, c, b); addTriangle(a, d, c);
+    addTriangle(backA, backB, backC); addTriangle(backA, backC, backD);
+    addTriangle(a, b, backB); addTriangle(a, backB, backA);
+    addTriangle(b, c, backC); addTriangle(b, backC, backB);
+    addTriangle(c, d, backD); addTriangle(c, backD, backC);
+    addTriangle(d, a, backA); addTriangle(d, backA, backD);
+  };
+  for (let arm = 0; arm < 6; arm += 1) {
+    const angle = arm * Math.PI / 3 - Math.PI / 2;
+    const ux = Math.cos(angle);
+    const uy = Math.sin(angle);
+    addSegment(0, 0, ux * 0.12, uy * 0.12, 0.014);
+    const branchStart = 0.067;
+    const branchEnd = 0.108;
+    for (const side of [-1, 1]) {
+      const branchAngle = angle + side * 0.78;
+      addSegment(ux * branchStart, uy * branchStart, Math.cos(branchAngle) * branchEnd, Math.sin(branchAngle) * branchEnd, 0.011);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  return geometry;
 }
 
 function createStarGeometry(THREE: ThreeModule): import("three").BufferGeometry {
   const shape = new THREE.Shape();
   for (let point = 0; point < 10; point += 1) {
-    const radius = point % 2 === 0 ? 0.16 : 0.072;
+    const radius = point % 2 === 0 ? 0.12 : 0.054;
     const angle = -Math.PI / 2 + point * Math.PI / 5;
     const x = Math.cos(angle) * radius;
     const y = Math.sin(angle) * radius;
@@ -630,7 +727,7 @@ function createStarGeometry(THREE: ThreeModule): import("three").BufferGeometry 
     else shape.lineTo(x, y);
   }
   shape.closePath();
-  return new THREE.ExtrudeGeometry(shape, { depth: 0.045, bevelEnabled: true, bevelSegments: 1, steps: 1, bevelSize: 0.008, bevelThickness: 0.008 });
+  return new THREE.ExtrudeGeometry(shape, { depth: 0.032, bevelEnabled: true, bevelSegments: 1, steps: 1, bevelSize: 0.005, bevelThickness: 0.005 });
 }
 
 function syncMarkers(runtime: Runtime, design: TreeDesign, showSlots: boolean) {
