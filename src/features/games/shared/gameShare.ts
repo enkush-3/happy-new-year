@@ -59,16 +59,20 @@ export function presentGameResult(result: GameResult): GameResultPresentation {
         details: [`Хэмжсэн хугацаа: ${formatSeconds(result.elapsedMs, 3)} сек`, `Зорилтот хугацаа: ${formatSeconds(targetMs, 3)} сек`],
       };
     case "sleigh-runner":
+      if (!("score" in result)) {
+        return {
+          title: "Чарганы уралдаан",
+          text: `${result.distance} метр · ${result.giftsCaught} бэлэг цуглууллаа`,
+          details: [`Туулсан зай: ${result.distance} м`, `Цуглуулсан бэлэг: ${result.giftsCaught}`],
+        };
+      }
       return {
         title: "Чарганы уралдаан",
-        text: `${result.distance} метр · ${result.giftsCaught} бэлэг цуглууллаа`,
-        details: [`Туулсан зай: ${result.distance} м`, `Цуглуулсан бэлэг: ${result.giftsCaught}`],
-      };
-    case "trivia":
-      return {
-        title: "Шинэ жилийн Trivia",
-        text: `${result.correctAnswers}/${result.totalQuestions} зөв · ${result.archetype}`,
-        details: [`Зөв хариулт: ${result.correctAnswers} / ${result.totalQuestions}`, `Онооны хувь: ${Math.round((result.correctAnswers / result.totalQuestions) * 100)}%`],
+        text: `${result.score} оноо · ${result.distance} метр тууллаа`,
+        details: [
+          `Тоглосон хугацаа: ${formatSeconds(result.elapsedMs)} сек`,
+          `Эцсийн хурд: ${result.finalSpeed} м/с`,
+        ],
       };
   }
 }
@@ -102,11 +106,13 @@ function isGameResult(value: unknown): value is GameResult {
       return isBoundedInt(result.targetMs, COUNTDOWN_STOPPER_MIN_TARGET_MS, COUNTDOWN_STOPPER_MAX_TARGET_MS) &&
         result.deviationMs === Math.abs(result.elapsedMs - result.targetMs);
     case "sleigh-runner":
+      if ("score" in result) {
+        return isBoundedInt(result.score, 0, 1_000_000) &&
+          isBoundedInt(result.distance, 0, 1_000_000) &&
+          isBoundedInt(result.elapsedMs, 0, 86_400_000) &&
+          isBoundedInt(result.finalSpeed, 0, 10_000);
+      }
       return isBoundedInt(result.distance, 0, 1_000_000) && isBoundedInt(result.giftsCaught, 0, 1_000_000);
-    case "trivia":
-      return isBoundedInt(result.totalQuestions, 10, 20) &&
-        isBoundedInt(result.correctAnswers, 0, result.totalQuestions) &&
-        typeof result.archetype === "string" && result.archetype.length > 0 && result.archetype.length <= 48;
     default:
       return false;
   }

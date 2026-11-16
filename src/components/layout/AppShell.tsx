@@ -12,7 +12,7 @@ export default function AppShell() {
   return (
     <div className="app-shell">
       <div className="ambient-snow" aria-hidden="true">
-        {Array.from({ length: 68 }, (_, index) => (
+        {Array.from({ length: 136 }, (_, index) => (
           <i
             key={index}
             style={{

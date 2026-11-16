@@ -6,8 +6,7 @@ const results: GameResult[] = [
   { gameId: "gift-catcher", score: 120, giftsCaught: 12, hazardsHit: 1, elapsedMs: 30000 },
   { gameId: "snowflake-clicker", score: 45, hits: 45, elapsedMs: 30000 },
   { gameId: "countdown-stopper", elapsedMs: 8_012, targetMs: 8_000, deviationMs: 12, score: 988 },
-  { gameId: "sleigh-runner", distance: 830, giftsCaught: 8 },
-  { gameId: "trivia", correctAnswers: 8, totalQuestions: 10, archetype: "Баярын мастер" },
+  { gameId: "sleigh-runner", score: 830, distance: 830, elapsedMs: 18_200, finalSpeed: 520 },
 ];
 
 function encodePayload(value: unknown) {
@@ -31,14 +30,17 @@ describe("game result sharing", () => {
     expect(decodeGameResult(invalidPayload, "gift-catcher")).toBeNull();
   });
 
-  it("accepts variable trivia totals from 10 to 20, including legacy ten-question links", () => {
-    const variableTrivia = { gameId: "trivia", correctAnswers: 13, totalQuestions: 17, archetype: "Баярын мастер" };
-    expect(decodeGameResult(encodePayload(variableTrivia), "trivia")).toEqual(variableTrivia);
-    expect(decodeGameResult(encodeGameResult(results.find((result) => result.gameId === "trivia")!), "trivia")).toEqual(
-      results.find((result) => result.gameId === "trivia"),
-    );
-    expect(decodeGameResult(encodePayload({ ...variableTrivia, totalQuestions: 21 }), "trivia")).toBeNull();
-    expect(decodeGameResult(encodePayload({ ...variableTrivia, correctAnswers: 18 }), "trivia")).toBeNull();
+  it("keeps reading old sleigh results while new results contain runner details", () => {
+    const oldResult = { gameId: "sleigh-runner", distance: 640, giftsCaught: 4 };
+    expect(decodeGameResult(encodePayload(oldResult), "sleigh-runner")).toEqual(oldResult);
+    const newResult = results.find((result) => result.gameId === "sleigh-runner")!;
+    expect(decodeGameResult(encodeGameResult(newResult), "sleigh-runner")).toEqual(newResult);
+    expect(presentGameResult(newResult)).toMatchObject({
+      text: expect.stringContaining("оноо"),
+      details: expect.arrayContaining([expect.stringContaining("Тоглосон хугацаа"), expect.stringContaining("Эцсийн хурд: 520 м/с")]),
+    });
+    expect(presentGameResult(newResult).details).toHaveLength(2);
+    expect(decodeGameResult(encodePayload({ ...newResult, finalSpeed: -1 }), "sleigh-runner")).toBeNull();
   });
 
   it("decodes old stopper links without inventing an elapsed time", () => {
@@ -68,13 +70,6 @@ describe("game result sharing", () => {
     expect(presentGameResult(decoded!)).toMatchObject({
       details: expect.arrayContaining(["Зорилтот хугацаа: 20.270 сек"]),
     });
-  });
-
-  it("does not decode retired Fortune Cookie results", () => {
-    expect(decodeGameResult(encodePayload({
-      gameId: "fortune-cookie",
-      fortunes: ["Аз жаргал ирнэ", "Шинэ найзтай болно", "Сайхан аялал хийнэ"],
-    }))).toBeNull();
   });
 
   it("creates a readable share summary for each game result", () => {

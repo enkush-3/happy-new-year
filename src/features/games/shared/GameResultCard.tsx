@@ -23,7 +23,7 @@ interface ResultHighlight {
 
 export default function GameResultCard({ result, bestRecords, nextGame, onReplay }: GameResultCardProps) {
   const presentation = presentGameResult(result);
-  const details = presentation.details.slice(0, 2).map(toStatistic);
+  const details = presentation.details.map(toStatistic);
   const statistics = [
     ...details,
     {
@@ -92,12 +92,7 @@ function getResultHighlight(result: GameResult): ResultHighlight {
         summary: "Зорилтот хугацаанд хэр ойр зогссоноо шалгаарай",
       };
     case "sleigh-runner":
-      return { value: String(result.distance), unit: "метр", summary: `${result.giftsCaught} бэлэг цуглууллаа` };
-    case "trivia":
-      return {
-        value: `${result.correctAnswers}/${result.totalQuestions}`,
-        unit: "зөв хариулт",
-        summary: result.archetype,
-      };
+      if (!("score" in result)) return { value: String(result.distance), unit: "метр", summary: "Хуучин тоглолтын үр дүн" };
+      return { value: String(result.score), unit: "оноо", summary: `${result.distance} метр тууллаа` };
   }
 }

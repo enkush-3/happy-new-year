@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type PointerEvent } from "react";
-import { GIFT_CATCHER_DURATION_MS, GIFT_CATCHER_STARTING_LIVES, moveBasket, positionBasketAt, resolveCatches, type CatchStats, type FallingObject, type FallingObjectKind } from "./model";
+import { useEffect, useRef, useState, type MouseEvent, type PointerEvent } from "react";
+import { GIFT_CATCHER_DURATION_MS, GIFT_CATCHER_STARTING_LIVES, getFallingSpeedMultiplier, moveBasket, moveBasketContinuously, positionBasketAt, resolveCatches, type CatchStats, type FallingObject, type FallingObjectKind } from "./model";
 import "./gift-catcher.css";
 
 export interface GiftCatcherResult {
@@ -31,7 +31,8 @@ const emptyGame: GameState = {
   hazardsHit: 0,
   lives: GIFT_CATCHER_STARTING_LIVES,
 };
-const simulationTickMs = 100;
+const simulationTickMs = 16;
+type Direction = -1 | 1;
 
 const objectIcons: Record<FallingObjectKind, string> = {
   gift: "🎁",
@@ -49,25 +50,47 @@ export default function GiftCatcherGame({ onComplete }: GiftCatcherGameProps) {
   const nextObjectAtMs = useRef(0);
   const hiddenAt = useRef<number | null>(null);
   const resultSent = useRef(false);
+  const heldDirections = useRef(new Map<string, Direction>());
 
   useEffect(() => {
     if (game.status !== "running") return;
 
     function onKeyDown(event: globalThis.KeyboardEvent) {
       if (isTextEntryTarget(event.target) || gameRef.current.status !== "running") return;
-      const key = event.key.toLowerCase();
-      const direction = event.key === "ArrowLeft" || event.code === "KeyA" || key === "a"
-        ? -1
-        : event.key === "ArrowRight" || event.code === "KeyD" || key === "d"
-          ? 1
-          : 0;
-      if (!direction) return;
+      const input = getKeyboardInput(event);
+      if (!input) return;
       event.preventDefault();
-      setGame((current) => current.status === "running" ? { ...current, basketX: moveBasket(current.basketX, direction) } : current);
+      heldDirections.current.set(input.id, input.direction);
+    }
+
+    function onKeyUp(event: globalThis.KeyboardEvent) {
+      const input = getKeyboardInput(event);
+      if (!input) return;
+      event.preventDefault();
+      heldDirections.current.delete(input.id);
+    }
+
+    function onPointerEnd(event: globalThis.PointerEvent) {
+      heldDirections.current.delete(`pointer:${event.pointerId}`);
+    }
+
+    function stopMovement() {
+      heldDirections.current.clear();
     }
 
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("pointerup", onPointerEnd);
+    window.addEventListener("pointercancel", onPointerEnd);
+    window.addEventListener("blur", stopMovement);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("pointerup", onPointerEnd);
+      window.removeEventListener("pointercancel", onPointerEnd);
+      window.removeEventListener("blur", stopMovement);
+      stopMovement();
+    };
   }, [game.status]);
 
   useEffect(() => {
@@ -76,6 +99,7 @@ export default function GiftCatcherGame({ onComplete }: GiftCatcherGameProps) {
     function handleVisibilityChange() {
       if (document.visibilityState === "hidden") {
         hiddenAt.current ??= Date.now();
+        heldDirections.current.clear();
       } else if (hiddenAt.current !== null) {
         startedAt.current += Date.now() - hiddenAt.current;
         hiddenAt.current = null;
@@ -90,14 +114,17 @@ export default function GiftCatcherGame({ onComplete }: GiftCatcherGameProps) {
       const elapsedMs = Math.min(Math.max(0, Date.now() - startedAt.current), GIFT_CATCHER_DURATION_MS);
       const deltaMs = Math.max(0, elapsedMs - lastElapsedMs.current);
       lastElapsedMs.current = elapsedMs;
-      const objects = current.objects.map((item) => ({ ...item, y: item.y + 3.2 * deltaMs / simulationTickMs }));
+      const direction = resolveHeldDirection(heldDirections.current);
+      const basketX = direction ? moveBasketContinuously(current.basketX, direction, deltaMs) : current.basketX;
+      const fallSpeed = getFallingSpeedMultiplier(elapsedMs);
+      const objects = current.objects.map((item) => ({ ...item, y: item.y + 3.2 * deltaMs / 100 * fallSpeed }));
       while (elapsedMs >= nextObjectAtMs.current && elapsedMs < GIFT_CATCHER_DURATION_MS) {
         objects.push(makeFallingObject(nextObjectId.current++));
         nextObjectAtMs.current += 700;
       }
-      const resolved = resolveCatches(current, objects, current.basketX);
+      const resolved = resolveCatches(current, objects, basketX);
       const status: GameState["status"] = elapsedMs >= GIFT_CATCHER_DURATION_MS || resolved.state.lives <= 0 ? "finished" : "running";
-      const nextGame = { ...current, ...resolved.state, elapsedMs, objects: resolved.remaining, status };
+      const nextGame = { ...current, ...resolved.state, elapsedMs, basketX, objects: resolved.remaining, status };
       gameRef.current = nextGame;
       setGame(nextGame);
     }, simulationTickMs);
@@ -141,6 +168,20 @@ export default function GiftCatcherGame({ onComplete }: GiftCatcherGameProps) {
     setGame((current) => ({ ...current, basketX: positionBasketAt(((event.clientX - bounds.left) / bounds.width) * 100) }));
   }
 
+  function onControlPointerDown(event: PointerEvent<HTMLButtonElement>, direction: Direction) {
+    if (game.status !== "running") return;
+    event.preventDefault();
+    heldDirections.current.set(`pointer:${event.pointerId}`, direction);
+    setGame((current) => current.status === "running"
+      ? { ...current, basketX: moveBasketContinuously(current.basketX, direction, simulationTickMs) }
+      : current);
+  }
+
+  function onControlClick(event: MouseEvent<HTMLButtonElement>, direction: Direction) {
+    if (event.detail !== 0 || game.status !== "running") return;
+    setGame((current) => current.status === "running" ? { ...current, basketX: moveBasket(current.basketX, direction) } : current);
+  }
+
   const secondsLeft = Math.ceil((GIFT_CATCHER_DURATION_MS - game.elapsedMs) / 1000);
   const finishedByHazard = game.status === "finished" && game.lives === 0;
 
@@ -172,7 +213,7 @@ export default function GiftCatcherGame({ onComplete }: GiftCatcherGameProps) {
           <span
             key={item.id}
             className={`gift-catcher__falling gift-catcher__falling--${item.kind}`}
-            style={{ left: `${item.x}%`, top: `${item.y}%`, transition: "top 100ms linear" }}
+            style={{ left: `${item.x}%`, top: `${item.y}%`, transition: `top ${simulationTickMs}ms linear` }}
             aria-hidden="true"
             data-testid={`falling-${item.kind}`}
           >{objectIcons[item.kind]}</span>
@@ -200,13 +241,35 @@ export default function GiftCatcherGame({ onComplete }: GiftCatcherGameProps) {
       </div>
 
       <div className="gift-catcher__mobile-controls" aria-label="Сагсаа удирдах">
-        <button type="button" aria-label="Сагсыг зүүн тийш" disabled={game.status !== "running"} onClick={() => setGame((current) => ({ ...current, basketX: moveBasket(current.basketX, -1) }))}>←</button>
-        <span>Сагсаа хөдөлгө</span>
-        <button type="button" aria-label="Сагсыг баруун тийш" disabled={game.status !== "running"} onClick={() => setGame((current) => ({ ...current, basketX: moveBasket(current.basketX, 1) }))}>→</button>
+        <button type="button" aria-label="Сагсыг зүүн тийш" disabled={game.status !== "running"} onPointerDown={(event) => onControlPointerDown(event, -1)} onClick={(event) => onControlClick(event, -1)}>←</button>
+        <span>Дарж бариад сагсаа хөдөлгө</span>
+        <button type="button" aria-label="Сагсыг баруун тийш" disabled={game.status !== "running"} onPointerDown={(event) => onControlPointerDown(event, 1)} onClick={(event) => onControlClick(event, 1)}>→</button>
       </div>
-      <p className="mini-game__hint">Хулганаар чирэх, суман товч эсвэл A/D дарж сагсаа хөдөлгөнө.</p>
+      <p className="mini-game__hint">Хулганаар чирэх эсвэл суман товч/A/D дарж бариад сагсаа хөдөлгөнө.</p>
     </section>
   );
+}
+
+function getKeyboardInput(event: globalThis.KeyboardEvent): { id: string; direction: Direction } | null {
+  const key = event.key.toLowerCase();
+  if (event.key === "ArrowLeft" || event.code === "KeyA" || key === "a") {
+    return { id: event.code || event.key, direction: -1 };
+  }
+  if (event.key === "ArrowRight" || event.code === "KeyD" || key === "d") {
+    return { id: event.code || event.key, direction: 1 };
+  }
+  return null;
+}
+
+function resolveHeldDirection(held: ReadonlyMap<string, Direction>): -1 | 0 | 1 {
+  let left = false;
+  let right = false;
+  for (const direction of held.values()) {
+    left ||= direction === -1;
+    right ||= direction === 1;
+  }
+  if (left === right) return 0;
+  return left ? -1 : 1;
 }
 
 function isTextEntryTarget(target: EventTarget | null): boolean {

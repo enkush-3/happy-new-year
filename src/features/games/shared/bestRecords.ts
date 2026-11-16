@@ -87,15 +87,10 @@ export function isBetterGameResult(candidate: GameResult, current: GameResult | 
     }
     case "sleigh-runner": {
       if (current.gameId !== "sleigh-runner") return false;
-      return candidate.distance > current.distance ||
-        (candidate.distance === current.distance && candidate.giftsCaught > current.giftsCaught);
-    }
-    case "trivia": {
-      if (current.gameId !== "trivia") return false;
-      const accuracyDifference = candidate.correctAnswers * current.totalQuestions -
-        current.correctAnswers * candidate.totalQuestions;
-      return accuracyDifference > 0 ||
-        (accuracyDifference === 0 && candidate.correctAnswers > current.correctAnswers);
+      const candidateScore = "score" in candidate ? candidate.score : candidate.distance;
+      const currentScore = "score" in current ? current.score : current.distance;
+      if (candidateScore !== currentScore) return candidateScore > currentScore;
+      return candidate.distance > current.distance;
     }
   }
 }

@@ -3,7 +3,6 @@ export type GameId =
   | "snowflake-clicker"
   | "countdown-stopper"
   | "sleigh-runner"
-  | "trivia"
   | "tree-decorator";
 
 export type GameResult =
@@ -12,8 +11,8 @@ export type GameResult =
   | { gameId: "countdown-stopper"; elapsedMs: number; targetMs: number; deviationMs: number; score: number }
   | { gameId: "countdown-stopper"; elapsedMs: number; deviationMs: number; score: number }
   | { gameId: "countdown-stopper"; deviationMs: number; score: number }
-  | { gameId: "sleigh-runner"; distance: number; giftsCaught: number }
-  | { gameId: "trivia"; correctAnswers: number; totalQuestions: number; archetype: string };
+  | { gameId: "sleigh-runner"; score: number; distance: number; elapsedMs: number; finalSpeed: number }
+  | { gameId: "sleigh-runner"; distance: number; giftsCaught: number };
 
 export interface GameResultPresentation {
   title: string;

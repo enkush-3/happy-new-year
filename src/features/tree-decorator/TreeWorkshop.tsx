@@ -423,7 +423,13 @@ export default function TreeWorkshop() {
               <button className={"tree-workshop__ornament tree-workshop__ornament--eraser" + (tool === "eraser" ? " is-active" : "")} type="button" aria-label="Устгагч сонгох" aria-pressed={tool === "eraser"} onClick={() => { setTool("eraser"); setSelectedDecorationId(null); setNotice("Авах чимэглэлийн цэг дээр товшино уу."); }}><span aria-hidden="true">{eraserItem.icon}</span><small>{eraserItem.label}</small></button>
             </div>
             <button className="tree-workshop__select-mode" type="button" aria-pressed={tool === null} onClick={() => { setTool(null); setSelectedDecorationId(null); setNotice("Сонгох горимд орлоо. Модон дээрх чимэглэлээ товшоод нарийн тохиргоог нээнэ үү."); }}>⌖ <span>Сонгох ба нарийн засах</span></button>
-            {selectedDecoration && <div className="tree-workshop__selected" role="group" aria-label="Сонгосон чимэглэл"><span style={{ color: selectedDecoration.color }} aria-hidden="true">{selectedPaletteItem?.icon ?? "✦"}</span><div><strong>{selectedPaletteItem?.label ?? "Чимэглэл"}</strong><small>{selectedDecoration.slotId ?? getDecorationSlotId(selectedDecoration)} байрлал</small></div><button type="button" aria-label="Сонгосон чимэглэлийг устгах" onClick={removeSelected}>Устгах</button></div>}
+          </section>
+
+          <section className="tree-workshop__panel" aria-labelledby="edit-decoration-title">
+            <div className="tree-workshop__panel-title"><span aria-hidden="true">✎</span><div><h2 id="edit-decoration-title">Чимэглэл засах</h2><p>{selectedDecoration ? "Сонгосон чимэглэлийн өнцөг, өнгө, хэмжээг тохируулна" : "Чимэглэл сонгоод нарийн тохиргоог ашиглаарай"}</p></div></div>
+            {selectedDecoration ? (
+              <div className="tree-workshop__selected" role="group" aria-label="Сонгосон чимэглэл"><span style={{ color: selectedDecoration.color }} aria-hidden="true">{selectedPaletteItem?.icon ?? "✦"}</span><div><strong>{selectedPaletteItem?.label ?? "Чимэглэл"}</strong><small>{selectedDecoration.slotId ?? getDecorationSlotId(selectedDecoration)} байрлал</small></div><button type="button" aria-label="Сонгосон чимэглэлийг устгах" onClick={removeSelected}>Устгах</button></div>
+            ) : <p className="tree-workshop__empty-selection">Модон дээрх чимэглэлээ товшиж сонгоно уу.</p>}
             <section className="tree-workshop__angle-panel" aria-labelledby="ornament-angle-title">
               <div className="tree-workshop__angle-heading">
                 <h3 id="ornament-angle-title">Чимэглэлийн өнцөг тааруулах</h3>
@@ -448,15 +454,14 @@ export default function TreeWorkshop() {
             <details className="tree-workshop__slot-list"><summary>Байрлалыг жагсаалтаас сонгох</summary><div>{TREE_SLOTS.map((slot, index) => <button type="button" key={slot.id} onClick={() => clickSlot(slot.id)}>{slot.tier === "topper" ? "Оройн од" : "Мөчир " + index}{design.decorations.some((item) => getDecorationSlotId(item) === slot.id) ? " · дүүрсэн" : " · хоосон"}</button>)}</div></details>
           </section>
 
-          <section className="tree-workshop__panel" aria-labelledby="theme-title">
-            <div className="tree-workshop__panel-title"><span aria-hidden="true">🌲</span><div><h2 id="theme-title">Модны өнгө</h2><p>3D навчны материалыг шууд шинэчилнэ</p></div></div>
+          <section className="tree-workshop__panel" aria-labelledby="appearance-title">
+            <div className="tree-workshop__panel-title"><span aria-hidden="true">🌲</span><div><h2 id="appearance-title">Модны төрх</h2><p>Өнгө болон гэрэлтүүлгийг тохируулна</p></div></div>
+            <h3 className="tree-workshop__subheading" id="theme-title">Модны өнгө</h3>
             <div className="tree-workshop__themes" role="group" aria-label="Гацуурын өнгө">
               {TREE_THEMES.map((theme) => <button key={theme.id} className={(design.theme ?? "classic-green") === theme.id ? "is-active" : ""} type="button" aria-label={theme.label} aria-pressed={(design.theme ?? "classic-green") === theme.id} onClick={() => updateTheme(theme.id)}><i style={{ backgroundColor: theme.color }} />{theme.label}</button>)}
             </div>
-          </section>
 
-          <section className="tree-workshop__panel" aria-labelledby="lights-title">
-            <div className="tree-workshop__panel-title"><span aria-hidden="true">✺</span><div><h2 id="lights-title">Гэрлэн чимэглэл</h2><p>Мөчрийг тойрсон зөөлөн гэрэл</p></div></div>
+            <h3 className="tree-workshop__subheading tree-workshop__subheading--lights" id="lights-title">Гэрлэн чимэглэл</h3>
             <label className="tree-workshop__toggle"><input type="checkbox" checked={design.lights.enabled} onChange={(event) => updateLights({ enabled: event.currentTarget.checked }, event.currentTarget.checked ? "Гэрлэн чимэглэлийг асаалаа." : "Гэрлэн чимэглэлийг унтраалаа.")} /> Гэрлийг асаах</label>
             <div className="tree-workshop__light-colors" role="group" aria-label="Гэрлийн өнгө">{lightColors.map((light) => <button key={light.color} className={design.lights.color === light.color ? "is-active" : ""} style={{ background: light.color }} type="button" aria-label={light.label + " гэрэл"} aria-pressed={design.lights.color === light.color} disabled={!design.lights.enabled} onClick={() => updateLights({ color: light.color }, light.label + " гэрэл сонголоо.")} />)}</div>
             <label className="tree-workshop__range">Гэрлийн тод байдал <output>{Math.round(design.lights.brightness * 100)}%</output><input aria-label="Гэрлийн тод байдал" type="range" min="0.2" max="1" step="0.05" value={design.lights.brightness} disabled={!design.lights.enabled} onChange={(event) => updateLights({ brightness: Number(event.currentTarget.value) }, "Гэрлийн тод байдлыг тохирууллаа.")} /></label>

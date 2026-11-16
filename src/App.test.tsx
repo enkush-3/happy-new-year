@@ -24,7 +24,7 @@ describe("Happy New Year game hub", () => {
   it("shows a denser snowfall behind the app", () => {
     renderApp("/");
 
-    expect(document.querySelectorAll(".ambient-snow > i")).toHaveLength(68);
+    expect(document.querySelectorAll(".ambient-snow > i")).toHaveLength(136);
   });
 
   it("keeps one clear games call to action on the home page", () => {
@@ -35,12 +35,13 @@ describe("Happy New Year game hub", () => {
     expect(screen.queryByRole("link", { name: /Бүх тоглоом/ })).not.toBeInTheDocument();
   });
 
-  it("lists the six public games, includes the tree decorator, and omits Fortune Cookie", () => {
+  it("lists five public games, includes the tree decorator, and omits retired games", () => {
     renderApp("/games");
 
     expect(screen.getByRole("heading", { name: "Тоглоомууд" })).toBeInTheDocument();
-    expect(document.querySelectorAll(".games-page__grid a.game-card")).toHaveLength(6);
+    expect(document.querySelectorAll(".games-page__grid a.game-card")).toHaveLength(5);
     expect(document.querySelector('a[href="/games/fortune-cookie"]')).toBeNull();
+    expect(document.querySelector('a[href="/games/trivia"]')).toBeNull();
   });
 
   it("navigates from the header to the game library", async () => {

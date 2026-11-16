@@ -41,6 +41,25 @@ describe("shared game result routes", () => {
     expect(screen.getByRole("button", { name: /дахин тоглох/i })).toBeInTheDocument();
   });
 
+  it("restores the distance, play time, and speed from a Sleigh Runner share link", () => {
+    window.sessionStorage.clear();
+    window.localStorage.clear();
+    const result = {
+      gameId: "sleigh-runner" as const,
+      score: 830,
+      distance: 830,
+      elapsedMs: 18_200,
+      finalSpeed: 52,
+    };
+
+    renderAt(`/games/sleigh-runner?result=${encodeGameResult(result)}`);
+
+    expect(screen.getByRole("heading", { level: 1, name: "Чарганы уралдаан" })).toBeInTheDocument();
+    expect(screen.getByText("830", { selector: ".game-result-score" })).toBeInTheDocument();
+    expect(screen.getByText("Эцсийн хурд").nextElementSibling).toHaveTextContent("52 м/с");
+    expect(document.querySelectorAll(".game-result-stat")).toHaveLength(4);
+  });
+
   it("falls back to the initial game when a result payload is malformed", () => {
     renderAt("/games/countdown-stopper?result=not-a-valid-payload");
 
@@ -50,6 +69,13 @@ describe("shared game result routes", () => {
 
   it("does not expose the retired Fortune Cookie route", () => {
     renderAt("/games/fortune-cookie");
+
+    expect(screen.getByRole("heading", { name: "Тоглоом олдсонгүй" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Тоглоомууд руу буцах" })).toHaveAttribute("href", "/games");
+  });
+
+  it("does not expose the removed Trivia route", () => {
+    renderAt("/games/trivia");
 
     expect(screen.getByRole("heading", { name: "Тоглоом олдсонгүй" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Тоглоомууд руу буцах" })).toHaveAttribute("href", "/games");

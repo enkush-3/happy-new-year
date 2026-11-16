@@ -21,12 +21,12 @@ describe("games page", () => {
   it("filters the catalog and derives counts from each category", () => {
     renderGamesPage();
 
-    const allGames = screen.getByRole("button", { name: "Бүх тоглоом (6)" });
+    const allGames = screen.getByRole("button", { name: "Бүх тоглоом (5)" });
     const actionGames = screen.getByRole("button", { name: "Хурд ба авхаалж (4)" });
-    const creativeGames = screen.getByRole("button", { name: "Бүтээлч ба танин мэдэхүй (2)" });
+    const creativeGames = screen.getByRole("button", { name: "Бүтээлч (1)" });
 
-    expect(screen.getAllByRole("link")).toHaveLength(6);
-    expect(screen.getByRole("status")).toHaveTextContent("6 тоглоом");
+    expect(screen.getAllByRole("link")).toHaveLength(5);
+    expect(screen.getByRole("status")).toHaveTextContent("5 тоглоом");
     fireEvent.click(actionGames);
     expect(screen.getAllByRole("link")).toHaveLength(4);
     expect(screen.getByRole("status")).toHaveTextContent("4 тоглоом");
@@ -34,11 +34,11 @@ describe("games page", () => {
     expect(screen.queryByRole("link", { name: /Гацуураа чимэглэ/ })).not.toBeInTheDocument();
 
     fireEvent.click(creativeGames);
-    expect(screen.getAllByRole("link")).toHaveLength(2);
-    expect(screen.getByRole("link", { name: /Шинэ жилийн Trivia/ })).toBeInTheDocument();
+    expect(screen.getAllByRole("link")).toHaveLength(1);
+    expect(screen.queryByRole("link", { name: /Шинэ жилийн Trivia/ })).not.toBeInTheDocument();
 
     fireEvent.click(allGames);
-    expect(screen.getAllByRole("link")).toHaveLength(6);
+    expect(screen.getAllByRole("link")).toHaveLength(5);
   });
 
   it("makes each card a single accessible link with a clear play action", () => {

@@ -3,12 +3,12 @@ import GameCard from "../../components/ui/GameCard";
 import { gameCatalog } from "../../features/games/gameCatalog";
 import "./games-page.css";
 
-type GameFilter = "all" | "action" | "creative-knowledge";
+type GameFilter = "all" | "action" | "creative";
 
 const filters: { id: GameFilter; label: string }[] = [
   { id: "all", label: "Бүх тоглоом" },
   { id: "action", label: "Хурд ба авхаалж" },
-  { id: "creative-knowledge", label: "Бүтээлч ба танин мэдэхүй" },
+  { id: "creative", label: "Бүтээлч" },
 ];
 
 export default function GamesPage() {

@@ -27,12 +27,12 @@ describe("per-game best records", () => {
       { gameId: "gift-catcher", score: 100, giftsCaught: 4, hazardsHit: 0, elapsedMs: 30_000 })).toBe(true);
     expect(isBetterGameResult({ gameId: "countdown-stopper", elapsedMs: 20_275, deviationMs: 5, score: 995 },
       { gameId: "countdown-stopper", elapsedMs: 20_300, deviationMs: 30, score: 970 })).toBe(true);
-    expect(isBetterGameResult({ gameId: "trivia", correctAnswers: 12, totalQuestions: 15, archetype: "A" },
-      { gameId: "trivia", correctAnswers: 8, totalQuestions: 10, archetype: "B" })).toBe(true);
-    expect(isBetterGameResult({ gameId: "trivia", correctAnswers: 11, totalQuestions: 15, archetype: "A" },
-      { gameId: "trivia", correctAnswers: 8, totalQuestions: 10, archetype: "B" })).toBe(false);
-    expect(isBetterGameResult({ gameId: "sleigh-runner", distance: 900, giftsCaught: 2 },
-      { gameId: "sleigh-runner", distance: 850, giftsCaught: 20 })).toBe(true);
+    expect(isBetterGameResult({ gameId: "sleigh-runner", score: 900, distance: 900, elapsedMs: 18_000, finalSpeed: 610 },
+      { gameId: "sleigh-runner", score: 850, distance: 850, elapsedMs: 17_000, finalSpeed: 570 })).toBe(true);
+    expect(isBetterGameResult({ gameId: "sleigh-runner", score: 700, distance: 700, elapsedMs: 15_000, finalSpeed: 500 },
+      { gameId: "sleigh-runner", distance: 720, giftsCaught: 14 })).toBe(false);
+    expect(isBetterGameResult({ gameId: "sleigh-runner", score: 730, distance: 730, elapsedMs: 15_500, finalSpeed: 520 },
+      { gameId: "sleigh-runner", distance: 720, giftsCaught: 14 })).toBe(true);
   });
 
   it("keeps separate session and device records for each game", () => {
@@ -60,8 +60,8 @@ describe("per-game best records", () => {
   });
 
   it("does not replace a better record with a worse result", () => {
-    const best: GameResult = { gameId: "trivia", correctAnswers: 9, totalQuestions: 10, archetype: "A" };
-    const lower: GameResult = { gameId: "trivia", correctAnswers: 13, totalQuestions: 20, archetype: "B" };
+    const best: GameResult = { gameId: "sleigh-runner", score: 900, distance: 900, elapsedMs: 18_000, finalSpeed: 610 };
+    const lower: GameResult = { gameId: "sleigh-runner", score: 850, distance: 850, elapsedMs: 17_000, finalSpeed: 570 };
     manager.record(best);
     expect(manager.record(lower)).toEqual({ sessionBest: best, deviceBest: best });
   });

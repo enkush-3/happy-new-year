@@ -5,7 +5,6 @@ import CountdownStopperGame from "../../features/games/countdown-stopper/Countdo
 import GiftCatcherGame from "../../features/games/gift-catcher/GiftCatcherGame";
 import SleighRunnerGame from "../../features/games/sleigh-runner/SleighRunnerGame";
 import SnowflakeClickerGame from "../../features/games/snowflake-clicker/SnowflakeClickerGame";
-import TriviaGame from "../../features/games/trivia/TriviaGame";
 import { findGame, gameCatalog } from "../../features/games/gameCatalog";
 import GameResultCard from "../../features/games/shared/GameResultCard";
 import { decodeGameResult, encodeGameResult } from "../../features/games/shared/gameShare";
@@ -87,7 +86,6 @@ function GameInstance({ gameId, onComplete }: { gameId: Exclude<GameId, "tree-de
     case "snowflake-clicker": return <SnowflakeClickerGame onComplete={onComplete} />;
     case "countdown-stopper": return <CountdownStopperGame onComplete={onComplete} />;
     case "sleigh-runner": return <SleighRunnerGame onComplete={onComplete} />;
-    case "trivia": return <TriviaGame onComplete={onComplete} />;
   }
 }
 
