@@ -31,7 +31,7 @@ export default function GameResultCard({ result, bestRecords, nextGame, onReplay
       value: bestRecords.sessionBest ? presentGameResult(bestRecords.sessionBest).text : "Одоогоор бүртгэгдээгүй",
     },
     {
-      label: "Төхөөрөмжийн дээд амжилт",
+      label: "Дээд амжилт",
       value: bestRecords.deviceBest ? presentGameResult(bestRecords.deviceBest).text : "Одоогоор бүртгэгдээгүй",
     },
   ];
@@ -71,8 +71,10 @@ export default function GameResultCard({ result, bestRecords, nextGame, onReplay
 function toStatistic(detail: string) {
   const separatorIndex = detail.indexOf(":");
   if (separatorIndex === -1) return { label: "Дэлгэрэнгүй", value: detail };
+  const rawLabel = detail.slice(0, separatorIndex).trim();
+  const label = rawLabel === "Тоглосон хугацаа" || rawLabel === "Хэмжсэн хугацаа" ? "Хугацаа" : rawLabel;
   return {
-    label: detail.slice(0, separatorIndex).trim(),
+    label,
     value: detail.slice(separatorIndex + 1).trim(),
   };
 }

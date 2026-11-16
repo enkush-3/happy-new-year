@@ -1,11 +1,18 @@
-import { Outlet } from "react-router";
+import { useEffect } from "react";
+import { Outlet, useLocation } from "react-router";
 import AppHeader from "./AppHeader";
 
 export default function AppShell() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [pathname]);
+
   return (
     <div className="app-shell">
       <div className="ambient-snow" aria-hidden="true">
-        {Array.from({ length: 36 }, (_, index) => (
+        {Array.from({ length: 68 }, (_, index) => (
           <i
             key={index}
             style={{

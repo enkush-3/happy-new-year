@@ -5,6 +5,7 @@ import "../tree-3d.css";
 type ThreeModule = typeof import("three");
 export type TreeCameraView = { azimuth: number; elevation: number; distance: number };
 export type TreePlacement = { x: number; y: number; angle: number; radius: number };
+export interface TreeExportControls { setMarkersVisible: (visible: boolean) => void }
 type OrnamentDrag = { id: string; point: TreePlacement; startX: number; startY: number; moved: boolean };
 type OrbitPointer = { x: number; y: number };
 type OrbitGesture = { pointers: Map<number, OrbitPointer>; center: OrbitPointer; distance: number; time: number };

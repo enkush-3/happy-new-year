@@ -26,7 +26,7 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .header-note { display: flex; justify-self: end; gap: 9px; align-items: center; min-height: 40px; padding: 0 13px; border: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant), transparent 22%); border-radius: var(--md-sys-shape-corner-full); color: #cbd5e1; background: color-mix(in srgb, var(--md-sys-color-surface-container-low), transparent 12%); font-size: 12px; }
 .header-note__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--md-sys-color-tertiary); box-shadow: 0 0 10px color-mix(in srgb, var(--md-sys-color-tertiary), transparent 35%); }
 
-.app-main { position: relative; z-index: 1; display: flex; flex: 1 0 auto; flex-direction: column; width: min(1024px, 100%); min-height: 0; margin: 0 auto; padding: clamp(24px, 4vh, 40px) 0 24px; }
+.app-main { position: relative; z-index: 1; display: flex; flex: 1 0 auto; flex-direction: column; width: min(1152px, 100%); min-height: 0; margin: 0 auto; padding: clamp(24px, 4vh, 40px) 0 24px; }
 .app-footer { position: relative; z-index: 1; display: flex; flex: 0 0 auto; justify-content: center; gap: 12px; align-items: center; width: min(1024px, 100%); margin: auto auto 0; padding: 24px 0; border-top: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant), transparent 62%); color: #cbd5e1; font-size: 13px; }
 .app-footer span { color: var(--md-sys-color-primary); }
 .eyebrow { display: flex; justify-content: center; gap: 9px; align-items: center; margin: 0 0 13px; color: var(--md-sys-color-primary); font-size: 10px; font-weight: 800; letter-spacing: .2em; text-align: center; }
@@ -74,7 +74,8 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .game-page-heading .back-link { margin: 0 auto 5px; }
 .game-page.is-result { margin: auto; }
 .game-play-surface { width: min(840px, 100%); margin: 0 auto; padding: clamp(16px, 3vw, 28px); border: 1px solid var(--line); border-radius: var(--md-sys-shape-corner-extra-large); background: var(--md-sys-color-surface-container-low); box-shadow: var(--md-sys-elevation-2); }
-.game-play-surface.is-result { max-width: 672px; }
+.game-page.is-result { width: min(576px, 100%); }
+.game-play-surface.is-result { max-width: 576px; }
 .game-result-card { display: flex; min-height: 340px; flex-direction: column; justify-content: center; align-items: center; padding: 32px 18px; text-align: center; }
 .game-result-mark { display: grid; width: 64px; height: 64px; place-items: center; border-radius: 50%; color: var(--md-sys-color-on-primary-container); background: var(--md-sys-color-primary-container); font-size: 27px; }
 .game-result-card .eyebrow { margin: 20px 0 8px; }

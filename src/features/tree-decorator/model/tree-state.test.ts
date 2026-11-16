@@ -8,7 +8,9 @@ import {
   MAX_DECORATIONS,
   moveDecoration,
   removeDecoration,
+  setSlotDecoration,
   transformDecoration,
+  TREE_SLOTS,
   type TreeDecoration,
   type TreeDesign,
 } from "./tree-state";
@@ -26,6 +28,34 @@ const ornament = (id: string, x = 0.5, y = 0.5): TreeDecoration => ({
 });
 
 describe("tree design state", () => {
+  it("exposes 29 fixed nodes with a star-only topper and short slot-based shares", () => {
+    expect(TREE_SLOTS).toHaveLength(29);
+    expect(TREE_SLOTS.filter((slot) => slot.tier !== "topper").map((slot) => slot.tier)).toEqual([
+      ...Array.from({ length: 4 }, () => "upper"),
+      ...Array.from({ length: 6 }, () => "mid-upper"),
+      ...Array.from({ length: 8 }, () => "mid-lower"),
+      ...Array.from({ length: 10 }, () => "bottom"),
+    ]);
+    expect(setSlotDecoration(DEFAULT_TREE_DESIGN, "slot-1", "star")).toBe(DEFAULT_TREE_DESIGN);
+
+    const placed = setSlotDecoration(DEFAULT_TREE_DESIGN, "slot-1", "bauble-red");
+    const fragment = encodeTreeFragment(placed);
+    const restored = decodeTreeFragment(fragment);
+
+    expect(fragment.length).toBeLessThan(180);
+    expect(restored.valid).toBe(true);
+    expect(restored.design.decorations[0]).toMatchObject({ slotId: "slot-1", kind: "bauble-red" });
+  });
+
+  it("round-trips advanced ornament styling alongside fixed slot ids", () => {
+    const placed = setSlotDecoration(DEFAULT_TREE_DESIGN, "slot-0", "star");
+    const styled = transformDecoration(placed, "decor-slot-0", { scale: 1.3, rotation: 30, color: "#98d8f2" });
+    const restored = decodeTreeFragment(encodeTreeFragment(styled));
+
+    expect(restored.valid).toBe(true);
+    expect(restored.design.decorations[0]).toMatchObject({ slotId: "slot-0", scale: 1.3, rotation: 30, color: "#98d8f2" });
+  });
+
   it("stores configurable twinkling strand settings in the current share version", () => {
     const design = {
       ...DEFAULT_TREE_DESIGN,

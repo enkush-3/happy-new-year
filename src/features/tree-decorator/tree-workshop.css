@@ -1,0 +1,120 @@
+.tree-workshop { width: min(1152px, 100%); margin: 0 auto; padding-top: 8px; }
+.tree-workshop__heading { margin: 0 auto 28px; padding-top: 8px; text-align: center; }
+.tree-workshop__heading h1 { max-width: 22ch; margin: 0 auto; color: #f8fafc; font-size: clamp(32px, 5vw, 54px); font-weight: 760; letter-spacing: -.045em; line-height: 1.08; text-wrap: balance; }
+.tree-workshop__heading > p:last-child { max-width: 58ch; margin: 12px auto 0; color: #cbd5e1; font-size: 15px; line-height: 1.6; }
+.tree-workshop__layout { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(320px, .8fr); gap: 20px; align-items: start; }
+.tree-workshop__canvas-card, .tree-workshop__panel { border: 1px solid rgba(173, 194, 225, .18); border-top-color: rgba(255,255,255,.18); background: linear-gradient(160deg, rgba(27, 40, 62, .95), rgba(12, 19, 32, .92)); box-shadow: 0 18px 54px rgba(0,0,0,.27), inset 0 1px rgba(255,255,255,.04); backdrop-filter: blur(20px); }
+.tree-workshop__canvas-card { min-width: 0; padding: clamp(16px, 2.5vw, 26px); border-radius: 30px; }
+.tree-workshop__canvas-heading { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-bottom: 16px; }
+.tree-workshop__canvas-heading > div > span { color: #fbbf24; font-size: 11px; font-weight: 800; letter-spacing: .15em; }
+.tree-workshop__canvas-heading h2 { margin: 6px 0 0; color: #f8fafc; font-size: clamp(20px, 2vw, 28px); letter-spacing: -.025em; }
+.tree-workshop__count { flex: 0 0 auto; padding: 9px 13px; border: 1px solid rgba(251,191,36,.3); border-radius: 999px; color: #fde68a; background: rgba(245,158,11,.12); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tree-workshop__toolbar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0 0 14px; }
+.tree-tool { display: flex; min-width: 0; min-height: 44px; justify-content: center; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid rgba(203,213,225,.2); border-radius: 14px; color: #e2e8f0; background: linear-gradient(180deg, rgba(51,65,85,.92), rgba(30,41,59,.96)); font-size: 14px; font-weight: 700; cursor: pointer; transition: background .2s ease, border-color .2s ease, transform .2s ease, box-shadow .2s ease; }
+.tree-tool span { font-size: 11px; line-height: 1.2; }
+.tree-tool:hover:not(:disabled) { border-color: rgba(251,191,36,.55); color: #fff; background: #334155; transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,.2); }
+.tree-tool:disabled { cursor: not-allowed; opacity: .45; }
+.tree-tool--primary { border-color: rgba(251,191,36,.52); color: #2a1b07; background: linear-gradient(180deg, #fde68a, #fbbf24); box-shadow: 0 0 22px rgba(245,158,11,.13); }
+.tree-tool--primary:hover:not(:disabled) { color: #1c1405; background: linear-gradient(180deg, #fef3c7, #facc15); }
+.tree-workshop__stage { position: relative; height: clamp(420px, 56vw, 690px); min-height: 420px; overflow: hidden; isolation: isolate; border: 1px solid rgba(148,163,184,.35); border-radius: 28px; background: radial-gradient(ellipse at 50% 45%, rgba(59,83,118,.34), transparent 48%), linear-gradient(155deg, #1b2b43 0%, #111c30 55%, #0b1323 100%); }
+.tree-workshop__stage::before { position: absolute; inset: 0; z-index: 0; content: ""; opacity: .5; pointer-events: none; background-image: radial-gradient(1px 1px at 15% 22%, #f5f8ff 99%, transparent), radial-gradient(1px 1px at 81% 17%, #fff1c8 99%, transparent), radial-gradient(1.4px 1.4px at 27% 71%, #e5f2ff 99%, transparent), radial-gradient(1px 1px at 72% 79%, #fff6d9 99%, transparent), radial-gradient(1px 1px at 44% 35%, #f8fafc 99%, transparent); }
+.tree-workshop__glow { position: absolute; z-index: 0; top: 19%; left: 50%; width: 52%; height: 48%; border-radius: 50%; background: radial-gradient(ellipse, rgba(251,191,36,.14), rgba(30,64,55,.12) 40%, transparent 72%); filter: blur(25px); transform: translateX(-50%); pointer-events: none; }
+.tree-workshop__ground { position: absolute; z-index: 0; bottom: 9%; left: 50%; width: 70%; height: 2px; border-radius: 50%; background: linear-gradient(90deg, transparent, rgba(187,209,235,.5), rgba(253,230,138,.42), rgba(187,209,235,.5), transparent); box-shadow: 0 0 26px rgba(179,214,255,.2); transform: translateX(-50%); }
+.tree-workshop__snow { position: absolute; z-index: 2; inset: 0; overflow: hidden; pointer-events: none; }
+.tree-workshop__snow i { position: absolute; top: -8px; width: 3px; height: 3px; border-radius: 50%; background: rgba(244,249,255,.9); box-shadow: 0 0 8px rgba(222,239,255,.6); animation: stage-snow-fall linear infinite; }
+.tree-workshop__hint { min-height: 24px; margin: 12px 2px 0; color: #d0d9e8; font-size: 13px; line-height: 1.5; }
+.tree-workshop__credit { margin: 8px 2px 0; color: #aebdd0; font-size: 11px; line-height: 1.5; }
+.tree-workshop__credit a { color: #fbbf24; text-underline-offset: 3px; }
+.tree-workshop__side { display: flex; min-width: 0; flex-direction: column; gap: 13px; }
+.tree-workshop__panel { min-width: 0; padding: 20px; border-radius: 25px; }
+.tree-workshop__panel-title { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+.tree-workshop__panel-title > span { display: grid; flex: 0 0 42px; width: 42px; height: 42px; place-items: center; border: 1px solid rgba(251,191,36,.28); border-radius: 15px; color: #fcd34d; background: rgba(245,158,11,.12); font-size: 21px; }
+.tree-workshop__panel-title h2 { margin: 0; color: #f8fafc; font-size: 19px; letter-spacing: -.02em; }
+.tree-workshop__panel-title p { margin: 5px 0 0; color: #cbd5e1; font-size: 12px; line-height: 1.45; }
+.tree-workshop__palette { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.tree-workshop__ornament { display: grid; min-width: 0; min-height: 80px; justify-items: center; align-content: center; gap: 7px; padding: 8px 5px; border: 1px solid rgba(148,163,184,.28); border-radius: 17px; color: #dbe5f2; background: rgba(9,15,27,.66); cursor: pointer; transition: background .2s ease, border-color .2s ease, transform .2s ease, box-shadow .2s ease; }
+.tree-workshop__ornament > span { font-size: 27px; line-height: 1; filter: drop-shadow(0 0 8px currentColor); }
+.tree-workshop__ornament small { overflow: hidden; max-width: 100%; font-size: 10px; line-height: 1.25; text-align: center; text-overflow: ellipsis; }
+.tree-workshop__ornament:hover { border-color: rgba(251,191,36,.5); background: rgba(30,41,59,.92); transform: translateY(-2px); }
+.tree-workshop__ornament.is-active { border-color: #fbbf24; color: #fff; background: rgba(180,112,22,.24); box-shadow: 0 0 0 2px rgba(251,191,36,.16), 0 0 20px rgba(245,158,11,.12); }
+.tree-workshop__ornament--eraser > span { color: #fecaca; }
+.tree-workshop__select-mode { display: flex; width: 100%; min-height: 44px; justify-content: center; align-items: center; gap: 8px; margin-top: 9px; border: 1px solid rgba(148,163,184,.28); border-radius: 13px; color: #cbd5e1; background: rgba(9,15,27,.52); font-size: 12px; font-weight: 700; cursor: pointer; transition: color .18s ease, border-color .18s ease, background .18s ease; }
+.tree-workshop__select-mode:hover { border-color: rgba(251,191,36,.48); color: #fff; background: rgba(30,41,59,.82); }
+.tree-workshop__select-mode[aria-pressed="true"] { border-color: rgba(251,191,36,.62); color: #fde68a; background: rgba(180,112,22,.16); }
+.tree-workshop__selected { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 12px; border: 1px solid rgba(148,163,184,.2); border-radius: 15px; background: rgba(9,15,27,.55); }
+.tree-workshop__selected > span { font-size: 19px; }
+.tree-workshop__selected > div { display: grid; flex: 1; gap: 3px; min-width: 0; }
+.tree-workshop__selected strong { color: #f8fafc; font-size: 12px; }
+.tree-workshop__selected small { color: #b7c5d8; font-size: 10px; }
+.tree-workshop__selected button { min-height: 36px; padding: 0 11px; border: 1px solid rgba(248,113,113,.35); border-radius: 999px; color: #fecaca; background: rgba(127,29,29,.18); font-size: 11px; font-weight: 700; cursor: pointer; }
+.tree-workshop__advanced { margin-top: 9px; padding: 10px 11px; border: 1px solid rgba(148,163,184,.19); border-radius: 14px; background: rgba(9,15,27,.38); }
+.tree-workshop__advanced summary { color: #dbe5f2; font-size: 12px; font-weight: 650; cursor: pointer; }
+.tree-workshop__advanced-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.tree-workshop__advanced-actions button { min-height: 38px; padding: 0 10px; border: 1px solid rgba(148,163,184,.23); border-radius: 10px; color: #e2e8f0; background: rgba(30,41,59,.85); font-size: 11px; cursor: pointer; }
+.tree-workshop__advanced-actions button:disabled { cursor: not-allowed; opacity: .42; }
+.tree-workshop__advanced-colors { display: flex; flex-wrap: wrap; gap: 11px; align-items: center; margin-top: 12px; }
+.tree-workshop__advanced-colors button { width: 25px; height: 25px; border: 2px solid rgba(255,255,255,.5); border-radius: 50%; cursor: pointer; }
+.tree-workshop__advanced-colors button.is-active { outline: 2px solid #fbbf24; outline-offset: 3px; }
+.tree-workshop__slot-list { margin-top: 13px; border-top: 1px solid rgba(148,163,184,.16); padding-top: 11px; }
+.tree-workshop__slot-list summary { color: #cbd5e1; font-size: 12px; font-weight: 650; cursor: pointer; }
+.tree-workshop__slot-list > div { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 6px; max-height: 170px; overflow: auto; margin-top: 9px; }
+.tree-workshop__slot-list button { min-height: 36px; padding: 4px 8px; border: 1px solid rgba(148,163,184,.2); border-radius: 10px; color: #d9e2ee; background: rgba(9,15,27,.55); font-size: 10px; text-align: left; cursor: pointer; }
+.tree-workshop__themes { display: grid; gap: 8px; }
+.tree-workshop__themes button { display: flex; min-height: 44px; align-items: center; gap: 10px; padding: 0 12px; border: 1px solid rgba(148,163,184,.24); border-radius: 13px; color: #dce5f0; background: rgba(9,15,27,.58); font-size: 12px; text-align: left; cursor: pointer; }
+.tree-workshop__themes button.is-active { border-color: rgba(251,191,36,.72); color: #fff; background: rgba(180,112,22,.17); }
+.tree-workshop__themes i { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,.65); border-radius: 50%; box-shadow: 0 0 11px currentColor; }
+.tree-workshop__toggle { display: flex; min-height: 40px; align-items: center; gap: 10px; color: #e2e8f0; font-size: 13px; cursor: pointer; }
+.tree-workshop__toggle input { width: 18px; height: 18px; accent-color: #fbbf24; }
+.tree-workshop__toggle--subtle { color: #cbd5e1; font-size: 12px; }
+.tree-workshop__light-colors { display: flex; gap: 12px; align-items: center; padding: 3px 2px; }
+.tree-workshop__light-colors button { width: 28px; height: 28px; border: 2px solid rgba(255,255,255,.5); border-radius: 50%; cursor: pointer; }
+.tree-workshop__light-colors button.is-active { outline: 2px solid #fbbf24; outline-offset: 2px; }
+.tree-workshop__light-colors button:disabled { cursor: not-allowed; opacity: .38; }
+.tree-workshop__range { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; color: #cbd5e1; font-size: 12px; }
+.tree-workshop__range output { color: #fde68a; font-variant-numeric: tabular-nums; }
+.tree-workshop__range input { grid-column: 1 / -1; width: 100%; accent-color: #fbbf24; }
+.tree-workshop__share-actions { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+.tree-action { display: flex; min-width: 0; min-height: 44px; justify-content: flex-start; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid rgba(148,163,184,.25); border-radius: 13px; color: #e2e8f0; background: rgba(24,34,51,.92); font-size: 13px; font-weight: 680; cursor: pointer; transition: background .18s ease, border-color .18s ease, transform .18s ease; }
+.tree-action span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-action:hover:not(:disabled) { border-color: rgba(251,191,36,.55); background: #2c3a52; transform: translateY(-1px); }
+.tree-action:disabled { cursor: not-allowed; opacity: .45; }
+.tree-action--primary { border-color: transparent; color: #201605; background: linear-gradient(#fde68a, #fbbf24); box-shadow: 0 0 20px rgba(245,158,11,.15); }
+.tree-action--primary:hover:not(:disabled) { background: linear-gradient(#fef3c7, #facc15); }
+.tree-action--quiet { color: #cbd5e1; background: rgba(15,23,42,.48); }
+.tree-workshop__share-field { display: grid; gap: 6px; margin-top: 12px; }
+.tree-workshop__share-field label { color: #cbd5e1; font-size: 11px; }
+.tree-workshop__share-field input { width: 100%; min-height: 42px; padding: 0 11px; border: 1px solid rgba(148,163,184,.42); border-radius: 11px; color: #f8fafc; background: #0b1220; font-size: 11px; }
+.tree-workshop :focus-visible { outline: 2px solid #fde68a; outline-offset: 2px; }
+
+@media (max-width: 940px) {
+  .tree-workshop__layout { grid-template-columns: minmax(0, 1fr); }
+  .tree-workshop__side { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .tree-workshop__side > .tree-workshop__panel:last-child { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .tree-workshop { padding-top: 2px; }
+  .tree-workshop__heading { margin-bottom: 21px; }
+  .tree-workshop__heading h1 { font-size: clamp(30px, 9vw, 42px); }
+  .tree-workshop__heading > p:last-child { font-size: 13px; }
+  .tree-workshop__layout { gap: 12px; }
+  .tree-workshop__canvas-card { padding: 15px 12px; border-radius: 23px; }
+  .tree-workshop__canvas-heading h2 { font-size: 19px; }
+  .tree-workshop__canvas-heading > div > span { font-size: 9px; letter-spacing: .11em; }
+  .tree-workshop__count { padding: 8px 10px; font-size: 11px; }
+  .tree-workshop__toolbar { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 7px; }
+  .tree-tool { justify-content: flex-start; padding: 0 11px; }
+  .tree-tool span { font-size: 12px; }
+  .tree-workshop__stage { height: min(82svh, 620px); min-height: 430px; border-radius: 22px; }
+  .tree-workshop__side { display: flex; gap: 11px; }
+  .tree-workshop__panel { padding: 16px; border-radius: 21px; }
+  .tree-workshop__palette { grid-template-columns: repeat(3, minmax(0,1fr)); gap: 7px; }
+  .tree-workshop__ornament { min-height: 72px; border-radius: 14px; }
+  .tree-workshop__ornament small { font-size: 9px; }
+  .tree-workshop__share-actions { gap: 7px; }
+  .tree-action { padding: 0 10px; font-size: 12px; }
+  .tree-workshop__hint { font-size: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tree-workshop *, .tree-workshop *::before, .tree-workshop *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
+}

@@ -119,10 +119,14 @@
 .game-result-actions .share-status { text-align: center; }
 
 @media (max-width: 480px) {
-  .game-result-stats { grid-template-columns: minmax(0, 1fr); }
   .game-result-stat { min-height: 64px; }
   .game-result-highlight { padding: 16px 12px 14px; }
   .game-result-card { gap: 11px; }
+}
+
+@media (min-width: 600px) {
+  .game-result-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .game-result-stat { min-height: 88px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

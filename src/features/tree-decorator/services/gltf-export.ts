@@ -16,6 +16,13 @@ export async function downloadTreeGlb(root: Object3D | null): Promise<void> {
 
   const exportRoot = root.clone(true);
   exportRoot.name = "Happy New Year Tree";
+  const editorMarkers: Object3D[] = [];
+  if (typeof exportRoot.traverse === "function") {
+    exportRoot.traverse((object) => {
+      if (object.userData.emptySlotMarker === true) editorMarkers.push(object);
+    });
+  }
+  editorMarkers.forEach((object) => object.parent?.remove(object));
   exportRoot.userData = {
     ...exportRoot.userData,
     title: "Happy New Year 3D Tree",

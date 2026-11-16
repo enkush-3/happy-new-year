@@ -24,7 +24,7 @@ describe("Happy New Year game hub", () => {
   it("shows a denser snowfall behind the app", () => {
     renderApp("/");
 
-    expect(document.querySelectorAll(".ambient-snow > i")).toHaveLength(36);
+    expect(document.querySelectorAll(".ambient-snow > i")).toHaveLength(68);
   });
 
   it("keeps one clear games call to action on the home page", () => {
@@ -62,7 +62,7 @@ describe("Happy New Year game hub", () => {
   it("routes legacy tree share links to the preserved tree builder", async () => {
     renderApp("/#tree=eyJ2IjoxLCJkIjpbXX0");
 
-    expect(await screen.findByRole("heading", { name: "Модоо өөрийнхөөрөө бүтээ" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Өөрийн гацуураа чимэглэ" })).toBeInTheDocument();
   });
 
   it("shows a not-found page for unknown games", () => {

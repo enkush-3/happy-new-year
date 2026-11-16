@@ -68,10 +68,10 @@ describe("shared game result routes", () => {
     act(() => vi.advanceTimersByTime(8_001));
     fireEvent.click(screen.getByRole("button", { name: "Зогсоох" }));
 
-    expect(screen.getByText("Хэмжсэн хугацаа").nextElementSibling).toHaveTextContent("8.001 сек");
+    expect(screen.getByText("Хугацаа").nextElementSibling).toHaveTextContent("8.001 сек");
     expect(screen.getByText("Зорилтот хугацаа").nextElementSibling).toHaveTextContent("8.001 сек");
     expect(screen.getByText("Сессийн шилдэг").nextElementSibling).toHaveTextContent("Зорилтоос 0 мс зөрлөө");
-    expect(screen.getByText("Төхөөрөмжийн дээд амжилт").nextElementSibling).toHaveTextContent("Зорилтоос 0 мс зөрлөө");
+    expect(screen.getByText("Дээд амжилт").nextElementSibling).toHaveTextContent("Зорилтоос 0 мс зөрлөө");
     expect(window.sessionStorage.getItem("happy-new-year:best:session:countdown-stopper")).not.toBeNull();
     expect(window.localStorage.getItem("happy-new-year:best:device:countdown-stopper")).not.toBeNull();
   });
@@ -90,7 +90,7 @@ describe("shared game result routes", () => {
 
     renderAt(`/games/countdown-stopper?result=${encodeGameResult(result)}`);
 
-    expect(screen.getByText("Хэмжсэн хугацаа").nextElementSibling).toHaveTextContent("8.000 сек");
+    expect(screen.getByText("Хугацаа").nextElementSibling).toHaveTextContent("8.000 сек");
     expect(screen.getByText("Зорилтот хугацаа").nextElementSibling).toHaveTextContent("8.000 сек");
     expect(sessionWrite).not.toHaveBeenCalled();
   });

@@ -41,7 +41,7 @@ export default function GameCard({ game, index }: GameCardProps) {
         </span>
       </div>
       <span className="game-card__action">
-        Одоо тоглох <span aria-hidden="true">→</span>
+        Одоо тоглох <span aria-hidden="true">▶</span>
       </span>
     </Link>
   );

@@ -37,7 +37,7 @@ const editorColors: { color: OrnamentColor; label: string }[] = [
   { color: "#d58bea", label: "Нил ягаан" },
 ];
 
-export default function TreeGame() {
+export function LegacyTreeGame() {
   const [initialShare] = useState(() => {
     const hash = window.location.hash;
     const shared = decodeTreeFragment(hash);
@@ -387,3 +387,5 @@ function createId(): string {
 function wrapDegrees(value: number) {
   return ((value + 180) % 360 + 360) % 360 - 180;
 }
+
+export { default } from "./TreeWorkshop";
