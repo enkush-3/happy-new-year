@@ -16,6 +16,7 @@ import {
   transformDecoration,
   type OrnamentColor,
   type OrnamentKind,
+  type TreeDecoration,
   type TreeDesign,
   type TreeLights,
   type TreeTheme,
@@ -27,6 +28,8 @@ import "./tree-workshop.css";
 
 type TreeTool = OrnamentKind | "eraser";
 type DownloadStatus = "idle" | "png" | "glb";
+type RotationAxis = "rotX" | "rotY";
+type RotationPreset = Pick<TreeDecoration, RotationAxis>;
 
 const decorations: { kind: OrnamentKind; label: string; icon: string; color: OrnamentColor }[] = [
   { kind: "bauble-red", label: "Улаан бөмбөлөг", icon: "●", color: "#d96b5e" },
@@ -70,6 +73,7 @@ export default function TreeWorkshop() {
   designRef.current = design;
   const [tool, setTool] = useState<TreeTool | null>(null);
   const [selectedDecorationId, setSelectedDecorationId] = useState<string | null>(null);
+  const [rotationPreset, setRotationPreset] = useState<RotationPreset>({ rotX: 0, rotY: 0 });
   const [showSlots, setShowSlots] = useState(true);
   const [notice, setNotice] = useState(
     initialShare.discardedLegacyDrawing
@@ -124,6 +128,7 @@ export default function TreeWorkshop() {
     if (!tool) {
       if (current) {
         setSelectedDecorationId(current.id);
+        setRotationPreset({ rotX: current.rotX ?? 0, rotY: current.rotY ?? 0 });
         setNotice("Чимэглэл сонгогдлоо. Устгах бол устгагчийг сонгоод цэг дээр дахин товшино уу.");
       } else {
         setNotice("Эхлээд чимэглэл сонгоод цэг дээр товшино уу.");
@@ -148,7 +153,7 @@ export default function TreeWorkshop() {
       setNotice("Модны оройд зөвхөн алтан од байрлуулна.");
       return;
     }
-    const next = setSlotDecoration(currentDesign, slotId, tool);
+    const next = setSlotDecoration(currentDesign, slotId, tool, rotationPreset);
     if (next === currentDesign) return;
     const removedSame = current?.kind === tool;
     updateDesign(next, removedSame ? "Ижил чимэглэлийг дахин товшиж авлаа." : current ? "Сонгосон цэгийн чимэглэлийг сольлоо." : "Чимэглэлийг цэгт байрлууллаа.");
@@ -181,7 +186,8 @@ export default function TreeWorkshop() {
   function autoDecorate() {
     const nextDecorations = TREE_SLOTS.map((slot) => {
       const kind = slot.tier === "topper" ? "star" : autoKinds[Math.floor(Math.random() * autoKinds.length)];
-      return decorationForSlot(slot.id, kind);
+      const decoration = decorationForSlot(slot.id, kind);
+      return decoration ? { ...decoration, ...rotationPreset } : null;
     }).filter((item): item is NonNullable<typeof item> => item !== null);
     updateDesign({ ...designRef.current, decorations: nextDecorations }, "Гацуурыг автоматаар чимэглэлээ.");
     setSelectedDecorationId(null);
@@ -224,6 +230,7 @@ export default function TreeWorkshop() {
 
   function resetTree() {
     updateDesign(DEFAULT_TREE_DESIGN, "Модоо эхний төлөвт орууллаа.");
+    setRotationPreset({ rotX: 0, rotY: 0 });
     setTool(null);
     setSelectedDecorationId(null);
     setShareLink("");
@@ -282,6 +289,7 @@ export default function TreeWorkshop() {
     }
     setDownloadStatus("png");
     exportControlsRef.current?.setMarkersVisible(false);
+    exportControlsRef.current?.setSelectionHaloVisible(false);
     try {
       await downloadTreePng(canvas);
       setNotice("Цэгийн тэмдэглэгээгүй PNG зураг татагдлаа.");
@@ -289,6 +297,7 @@ export default function TreeWorkshop() {
       setNotice("Зураг татаж чадсангүй. Дахин оролдоно уу.");
     } finally {
       exportControlsRef.current?.setMarkersVisible(showSlots);
+      exportControlsRef.current?.setSelectionHaloVisible(true);
       setDownloadStatus("idle");
     }
   }
@@ -320,6 +329,34 @@ export default function TreeWorkshop() {
     if (!selectedDecorationId) return;
     updateDesign(transformDecoration(designRef.current, selectedDecorationId, changes), message);
   }
+
+  function selectDecoration(id: string) {
+    const decoration = designRef.current.decorations.find((item) => item.id === id);
+    if (decoration) setRotationPreset({ rotX: decoration.rotX ?? 0, rotY: decoration.rotY ?? 0 });
+    setSelectedDecorationId(id);
+  }
+
+  function changeRotation(axis: RotationAxis, value: number) {
+    const angle = Math.max(-180, Math.min(180, Math.round(value)));
+    const nextPreset = { ...rotationPreset, [axis]: angle };
+    setRotationPreset(nextPreset);
+    if (selectedDecorationId) {
+      changeSelected({ [axis]: angle }, `${axis === "rotY" ? "Хөндлөн" : "Босоо"} өнцгийг ${angle}° болголоо.`);
+    } else {
+      setNotice(`Шинэ чимэглэлийн өнцгийг ${angle}° болгож таарууллаа.`);
+    }
+  }
+
+  function resetRotation() {
+    setRotationPreset({ rotX: 0, rotY: 0 });
+    if (selectedDecorationId) changeSelected({ rotX: 0, rotY: 0 }, "Чимэглэлийн хоёр өнцгийг тэглэлээ.");
+    else setNotice("Шинэ чимэглэлийн хоёр өнцгийг тэглэлээ.");
+  }
+
+  const angleValues = {
+    rotX: selectedDecoration?.rotX ?? rotationPreset.rotX ?? 0,
+    rotY: selectedDecoration?.rotY ?? rotationPreset.rotY ?? 0,
+  };
 
   return (
     <section className="tree-workshop" aria-labelledby="tree-workshop-title">
@@ -357,7 +394,7 @@ export default function TreeWorkshop() {
               showSlots={showSlots}
               theme={design.theme ?? "classic-green"}
               onSlotClick={clickSlot}
-              onSelect={setSelectedDecorationId}
+              onSelect={selectDecoration}
               onPlace={onLegacyPlace}
               onMove={() => undefined}
               onMoveCommit={() => undefined}
@@ -387,7 +424,27 @@ export default function TreeWorkshop() {
             </div>
             <button className="tree-workshop__select-mode" type="button" aria-pressed={tool === null} onClick={() => { setTool(null); setSelectedDecorationId(null); setNotice("Сонгох горимд орлоо. Модон дээрх чимэглэлээ товшоод нарийн тохиргоог нээнэ үү."); }}>⌖ <span>Сонгох ба нарийн засах</span></button>
             {selectedDecoration && <div className="tree-workshop__selected" role="group" aria-label="Сонгосон чимэглэл"><span style={{ color: selectedDecoration.color }} aria-hidden="true">{selectedPaletteItem?.icon ?? "✦"}</span><div><strong>{selectedPaletteItem?.label ?? "Чимэглэл"}</strong><small>{selectedDecoration.slotId ?? getDecorationSlotId(selectedDecoration)} байрлал</small></div><button type="button" aria-label="Сонгосон чимэглэлийг устгах" onClick={removeSelected}>Устгах</button></div>}
-            {selectedDecoration && <details className="tree-workshop__advanced"><summary>Нарийн тохиргоо</summary><div className="tree-workshop__advanced-actions"><button type="button" onClick={() => changeSelected({ rotation: (selectedDecoration.rotation + 15) % 360 }, "Чимэглэлийг 15° эргүүллээ.")}>↻ 15°</button><button type="button" disabled={selectedDecoration.scale <= 0.6} onClick={() => changeSelected({ scale: Math.max(0.6, selectedDecoration.scale - 0.1) }, "Чимэглэлийг жижгэрүүллээ.")}>Жижигрүүлэх</button><button type="button" disabled={selectedDecoration.scale >= 1.6} onClick={() => changeSelected({ scale: Math.min(1.6, selectedDecoration.scale + 0.1) }, "Чимэглэлийг томрууллаа.")}>Томруулах</button></div><div className="tree-workshop__advanced-colors" role="group" aria-label="Чимэглэлийн өнгө">{ornamentColors.map((item) => <button key={item.color} type="button" aria-label={item.label + " өнгө"} aria-pressed={selectedDecoration.color === item.color} className={selectedDecoration.color === item.color ? "is-active" : ""} style={{ backgroundColor: item.color }} onClick={() => changeSelected({ color: item.color }, item.label + " өнгөөр сольлоо.")} />)}</div></details>}
+            <section className="tree-workshop__angle-panel" aria-labelledby="ornament-angle-title">
+              <div className="tree-workshop__angle-heading">
+                <h3 id="ornament-angle-title">Чимэглэлийн өнцөг тааруулах</h3>
+                <button className="tree-workshop__angle-reset" type="button" onClick={resetRotation}>↺ Тэглэх</button>
+              </div>
+              {([
+                ["rotY", "Хөндлөн", "Зүүн / баруун"],
+                ["rotX", "Босоо", "Дээш / доош"],
+              ] as const).map(([axis, label, hint]) => (
+                <div className="tree-workshop__angle-row" key={axis}>
+                  <label htmlFor={`tree-angle-${axis}`}><span>{label}</span><output className="tree-workshop__angle-value">{angleValues[axis]}°</output></label>
+                  <div className="tree-workshop__angle-controls">
+                    <button type="button" aria-label={`${label} өнцгийг 1°-аар багасгах`} disabled={angleValues[axis] <= -180} onClick={() => changeRotation(axis, angleValues[axis] - 1)}>−1°</button>
+                    <input id={`tree-angle-${axis}`} aria-label={`${label} өнцөг`} type="range" min="-180" max="180" step="1" value={angleValues[axis]} onChange={(event) => changeRotation(axis, Number(event.currentTarget.value))} />
+                    <button type="button" aria-label={`${label} өнцгийг 1°-аар нэмэх`} disabled={angleValues[axis] >= 180} onClick={() => changeRotation(axis, angleValues[axis] + 1)}>+1°</button>
+                  </div>
+                  <small>{hint}</small>
+                </div>
+              ))}
+            </section>
+            {selectedDecoration && <details className="tree-workshop__advanced" open><summary>Өнгө ба хэмжээ</summary><div className="tree-workshop__advanced-actions"><button type="button" disabled={selectedDecoration.scale <= 0.6} onClick={() => changeSelected({ scale: Math.max(0.6, selectedDecoration.scale - 0.1) }, "Чимэглэлийг жижгэрүүллээ.")}>Жижигрүүлэх</button><button type="button" disabled={selectedDecoration.scale >= 1.6} onClick={() => changeSelected({ scale: Math.min(1.6, selectedDecoration.scale + 0.1) }, "Чимэглэлийг томрууллаа.")}>Томруулах</button></div><div className="tree-workshop__advanced-colors" role="group" aria-label="Чимэглэлийн өнгө">{ornamentColors.map((item) => <button key={item.color} type="button" aria-label={item.label + " өнгө"} aria-pressed={selectedDecoration.color === item.color} className={selectedDecoration.color === item.color ? "is-active" : ""} style={{ backgroundColor: item.color }} onClick={() => changeSelected({ color: item.color }, item.label + " өнгөөр сольлоо.")} />)}</div></details>}
             <details className="tree-workshop__slot-list"><summary>Байрлалыг жагсаалтаас сонгох</summary><div>{TREE_SLOTS.map((slot, index) => <button type="button" key={slot.id} onClick={() => clickSlot(slot.id)}>{slot.tier === "topper" ? "Оройн од" : "Мөчир " + index}{design.decorations.some((item) => getDecorationSlotId(item) === slot.id) ? " · дүүрсэн" : " · хоосон"}</button>)}</div></details>
           </section>
 

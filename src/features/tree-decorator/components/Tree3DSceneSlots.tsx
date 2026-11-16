@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { OrnamentKind, TreeDecoration, TreeDesign, TreeTheme } from "../model/tree-state";
-import { getDecorationSlotId, TREE_SLOTS, TREE_THEMES } from "../model/tree-state";
+import { getDecorationSlotId, TREE_CONE_TIERS, TREE_SLOTS, TREE_THEMES } from "../model/tree-state";
 import type { TreeCameraView, TreeExportControls, TreePlacement } from "./Tree3DScene";
 import "../tree-3d.css";
 
@@ -190,7 +190,20 @@ export default function Tree3DSceneSlots(props: SlotTree3DSceneProps) {
         if (!observer) window.addEventListener("resize", onResize);
 
         propsRef.current.onExportRoot(treeRoot);
-        propsRef.current.onExportControls({ setMarkersVisible(visible) { if (!runtime) return; runtime.markers.forEach(({ indicator }) => { indicator.visible = visible && runtime!.showSlots && !isSlotOccupied(propsRef.current.design, String(indicator.userData.slotId)); }); render(); } });
+        propsRef.current.onExportControls({
+          setMarkersVisible(visible) {
+            if (!runtime) return;
+            runtime.markers.forEach(({ indicator }) => { indicator.visible = visible && runtime!.showSlots && !isSlotOccupied(propsRef.current.design, String(indicator.userData.slotId)); });
+            render();
+          },
+          setSelectionHaloVisible(visible) {
+            if (!runtime) return;
+            runtime.ornaments.forEach((hanger) => hanger.traverse((object) => {
+              if (object.userData.selectionHalo === true) object.visible = visible;
+            }));
+            render();
+          },
+        });
         updateCamera(runtime);
         setStatus("ready");
         renderer.setAnimationLoop(reducedMotion ? null : animate);
@@ -423,12 +436,7 @@ export default function Tree3DSceneSlots(props: SlotTree3DSceneProps) {
 
 function buildFallbackFoliage(runtime: Runtime, theme: TreeTheme) {
   const { THREE, treeRoot } = runtime;
-  const tiers = [
-    { top: 1.11, bottom: 0.25, radius: 0.39, tint: 1.06, branchY: 0.69, branchTipY: 0.34, branchRadius: 0.43, branchCount: 10, branchWidth: 0.13 },
-    { top: 0.58, bottom: -0.2, radius: 0.57, tint: 0.95, branchY: 0.18, branchTipY: -0.2, branchRadius: 0.61, branchCount: 12, branchWidth: 0.16 },
-    { top: 0.02, bottom: -0.67, radius: 0.75, tint: 0.87, branchY: -0.34, branchTipY: -0.72, branchRadius: 0.79, branchCount: 14, branchWidth: 0.18 },
-    { top: -0.45, bottom: -1.13, radius: 0.89, tint: 0.78, branchY: -0.79, branchTipY: -1.16, branchRadius: 0.94, branchCount: 16, branchWidth: 0.2 },
-  ];
+  const tiers = TREE_CONE_TIERS;
   tiers.forEach((tier, index) => {
     const material = new THREE.MeshBasicMaterial({ color: themeColor(theme), vertexColors: true, side: THREE.DoubleSide });
     material.color.multiplyScalar(tier.tint);
@@ -553,33 +561,88 @@ function createSlotTargets(runtime: Runtime) {
 }
 
 function syncDecorations(runtime: Runtime, design: TreeDesign, selectedId: string | null) {
-  runtime.ornaments.forEach((group) => {
+  const nextIds = new Set(design.decorations.map((decoration) => decoration.id));
+  runtime.ornaments.forEach((group, id) => {
+    if (nextIds.has(id)) return;
     runtime.treeRoot.remove(group);
     disposeObject(group);
+    runtime.ornaments.delete(id);
   });
-  runtime.ornaments.clear();
   design.decorations.forEach((decoration) => {
     const slotId = getDecorationSlotId(decoration);
     const slot = TREE_SLOTS.find((item) => item.id === slotId);
     if (!slot) return;
+    const selected = decoration.id === selectedId;
+    const existing = runtime.ornaments.get(decoration.id);
+    if (existing && existing.userData.selected === selected && sameDecorationExceptRotation(existing.userData.decoration as TreeDecoration | undefined, decoration)) {
+      const previous = existing.userData.decoration as TreeDecoration;
+      if ((previous.rotX ?? 0) !== (decoration.rotX ?? 0) || (previous.rotY ?? 0) !== (decoration.rotY ?? 0) || previous.rotation !== decoration.rotation) {
+        if (!updateOrnamentRotation(existing, decoration, runtime.THREE)) {
+          runtime.treeRoot.remove(existing);
+          disposeObject(existing);
+          runtime.ornaments.delete(decoration.id);
+        } else {
+          existing.userData.decoration = { ...decoration };
+          return;
+        }
+      } else {
+        existing.userData.decoration = { ...decoration };
+        return;
+      }
+    }
+    if (existing && runtime.ornaments.has(decoration.id)) {
+      runtime.treeRoot.remove(existing);
+      disposeObject(existing);
+      runtime.ornaments.delete(decoration.id);
+    }
     const hanger = createHanger(decoration, runtime.THREE, slotId === "slot-0", slot.normal, decoration.id === selectedId);
-    hanger.position.set(slot.position[0] + slot.normal[0] * 0.075, slot.position[1] + slot.normal[1] * 0.075, slot.position[2] + slot.normal[2] * 0.075);
+    hanger.position.set(...slot.position);
     hanger.userData.phase = Math.atan2(slot.position[0], slot.position[2]);
     hanger.userData.slotId = slotId;
+    hanger.userData.selected = selected;
+    hanger.userData.decoration = { ...decoration };
     runtime.treeRoot.add(hanger);
     runtime.ornaments.set(decoration.id, hanger);
   });
 }
 
+function sameDecorationExceptRotation(previous: TreeDecoration | undefined, next: TreeDecoration): boolean {
+  return Boolean(previous && previous.id === next.id && previous.kind === next.kind && previous.slotId === next.slotId &&
+    previous.x === next.x && previous.y === next.y && previous.angle === next.angle && previous.radius === next.radius &&
+    previous.scale === next.scale && previous.color === next.color);
+}
+
+function updateOrnamentRotation(group: import("three").Group, decoration: TreeDecoration, THREE: ThreeModule): boolean {
+  const display = group.children.find((child) => child.userData.decorationDisplay === true);
+  const visual = display?.children.find((child) => child.userData.ornamentVisual === true);
+  if (!visual) return false;
+  visual.rotation.set(
+    THREE.MathUtils.degToRad(decoration.rotX ?? 0),
+    THREE.MathUtils.degToRad(decoration.rotY ?? 0),
+    THREE.MathUtils.degToRad(decoration.rotation),
+    "YXZ",
+  );
+  return true;
+}
+
 function createHanger(decoration: TreeDecoration, THREE: ThreeModule, topper: boolean, normal: readonly [number, number, number], selected: boolean) {
   const group = new THREE.Group();
   group.userData.decorationId = decoration.id;
+  const ornamentRadius = ornamentRadiusFor(decoration);
   if (!topper) {
-    const hanger = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.055, 6), new THREE.MeshBasicMaterial({ color: 0xe9d9ae }));
-    hanger.position.y = -0.055;
-    group.add(hanger);
+    const gold = new THREE.MeshBasicMaterial({ color: 0xe9bd55 });
+    const loop = new THREE.Mesh(new THREE.TorusGeometry(0.018, 0.0035, 6, 14), gold);
+    loop.name = "Gold ornament hanging loop";
+    loop.rotation.x = Math.PI / 2;
+    loop.position.set(normal[0] * 0.012, -0.006, normal[2] * 0.012);
+    group.add(loop);
+    const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, ornamentRadius * 0.72, 6), gold);
+    wire.name = "Gold ornament hanging wire";
+    wire.position.set(normal[0] * 0.026, -ornamentRadius * 0.36, normal[2] * 0.026);
+    group.add(wire);
   }
   const ornament = createOrnamentMesh(decoration, THREE);
+  ornament.userData.ornamentVisual = true;
   ornament.userData.decorationId = decoration.id;
   if (selected) {
     ornament.traverse((object) => {
@@ -591,7 +654,8 @@ function createHanger(decoration: TreeDecoration, THREE: ThreeModule, topper: bo
     });
   }
   const display = new THREE.Group();
-  display.position.y = topper ? 0 : -0.055;
+  display.userData.decorationDisplay = true;
+  display.position.y = topper ? 0 : -ornamentRadius;
   if (!topper && (decoration.kind === "snowflake" || decoration.kind === "candy-cane")) {
     // Blend the slot's radial normal toward the default camera so flat details
     // remain recognizable at side slots instead of collapsing into thin slivers.
@@ -599,20 +663,42 @@ function createHanger(decoration: TreeDecoration, THREE: ThreeModule, topper: bo
     display.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), facing);
   }
   display.add(ornament);
+  if (selected) {
+    const halo = new THREE.Mesh(
+      new THREE.TorusGeometry(ornamentRadius * 1.52, Math.max(0.004, ornamentRadius * 0.035), 8, 36),
+      new THREE.MeshBasicMaterial({ color: 0xffcf62, transparent: true, opacity: 0.76, depthWrite: false, side: THREE.DoubleSide }),
+    );
+    halo.name = "Selected ornament soft glow";
+    halo.userData.editorOnly = true;
+    halo.userData.selectionHalo = true;
+    halo.position.z = decoration.kind === "snowflake" || decoration.kind === "candy-cane" ? 0.018 : 0;
+    display.add(halo);
+  }
   group.add(display);
   if (decoration.kind === "bell") {
     const clapper = new THREE.Mesh(new THREE.SphereGeometry(0.025, 9, 7), new THREE.MeshBasicMaterial({ color: 0xffd978 }));
-    clapper.position.y = -0.21;
-    group.add(clapper);
+    clapper.position.y = -0.09 * decoration.scale;
+    clapper.scale.setScalar(decoration.scale);
+    display.add(clapper);
   }
   return group;
 }
 
+function ornamentRadiusFor(decoration: TreeDecoration): number {
+  const baseRadius = decoration.kind === "bell" ? 0.08 : decoration.kind.startsWith("bauble-") ? 0.105 : 0.12;
+  return baseRadius * decoration.scale;
+}
+
 function createOrnamentMesh(decoration: TreeDecoration, THREE: ThreeModule) {
+  const rotation = [
+    THREE.MathUtils.degToRad(decoration.rotX ?? 0),
+    THREE.MathUtils.degToRad(decoration.rotY ?? 0),
+    THREE.MathUtils.degToRad(decoration.rotation),
+  ] as const;
   if (decoration.kind === "candy-cane") {
     const cane = createCandyCane(THREE);
     cane.scale.setScalar(decoration.scale);
-    cane.rotation.z = decoration.rotation * Math.PI / 180;
+    cane.rotation.set(...rotation, "YXZ");
     return cane;
   }
   let geometry: import("three").BufferGeometry;
@@ -626,8 +712,8 @@ function createOrnamentMesh(decoration: TreeDecoration, THREE: ThreeModule) {
   geometry = withFacetColor(THREE, geometry);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.scale.setScalar(decoration.scale);
-  mesh.rotation.z = decoration.rotation * Math.PI / 180;
-  if (decoration.kind === "bell") mesh.scale.set(0.85, 1.12, 0.85);
+  mesh.rotation.set(...rotation, "YXZ");
+  if (decoration.kind === "bell") mesh.scale.set(0.85 * decoration.scale, 1.12 * decoration.scale, 0.85 * decoration.scale);
   return mesh;
 }
 

@@ -10,6 +10,7 @@ import {
   removeDecoration,
   setSlotDecoration,
   transformDecoration,
+  TREE_CONE_TIERS,
   TREE_SLOTS,
   type TreeDecoration,
   type TreeDesign,
@@ -28,14 +29,22 @@ const ornament = (id: string, x = 0.5, y = 0.5): TreeDecoration => ({
 });
 
 describe("tree design state", () => {
-  it("exposes 29 fixed nodes with a star-only topper and short slot-based shares", () => {
-    expect(TREE_SLOTS).toHaveLength(29);
+  it("exposes 37 fixed nodes on the four cone rims with a star-only topper", () => {
+    expect(TREE_SLOTS).toHaveLength(37);
     expect(TREE_SLOTS.filter((slot) => slot.tier !== "topper").map((slot) => slot.tier)).toEqual([
-      ...Array.from({ length: 4 }, () => "upper"),
-      ...Array.from({ length: 6 }, () => "mid-upper"),
-      ...Array.from({ length: 8 }, () => "mid-lower"),
-      ...Array.from({ length: 10 }, () => "bottom"),
+      ...Array.from({ length: 6 }, () => "upper"),
+      ...Array.from({ length: 8 }, () => "mid-upper"),
+      ...Array.from({ length: 10 }, () => "mid-lower"),
+      ...Array.from({ length: 12 }, () => "bottom"),
     ]);
+    for (const tier of TREE_CONE_TIERS) {
+      const rimSlots = TREE_SLOTS.filter((slot) => slot.tier === tier.tier);
+      expect(rimSlots).toHaveLength(tier.slotCount);
+      rimSlots.forEach((slot) => {
+        expect(slot.position[1]).toBeCloseTo(tier.bottom, 5);
+        expect(Math.hypot(slot.position[0], slot.position[2])).toBeCloseTo(tier.radius * 0.95, 10);
+      });
+    }
     expect(setSlotDecoration(DEFAULT_TREE_DESIGN, "slot-1", "star")).toBe(DEFAULT_TREE_DESIGN);
 
     const placed = setSlotDecoration(DEFAULT_TREE_DESIGN, "slot-1", "bauble-red");
@@ -54,6 +63,27 @@ describe("tree design state", () => {
 
     expect(restored.valid).toBe(true);
     expect(restored.design.decorations[0]).toMatchObject({ slotId: "slot-0", scale: 1.3, rotation: 30, color: "#98d8f2" });
+  });
+
+  it("round-trips both 1-degree ornament rotations in v6 share data", () => {
+    const placed = setSlotDecoration(DEFAULT_TREE_DESIGN, "slot-1", "bauble-red", { rotX: -27, rotY: 146 });
+    const styled = transformDecoration(placed, "decor-slot-1", { rotation: 12 });
+    const fragment = encodeTreeFragment(styled);
+    const decoded = atob(fragment.slice("#tree=".length).replaceAll("-", "+").replaceAll("_", "/").padEnd(Math.ceil((fragment.length - 6) / 4) * 4, "="));
+    const restored = decodeTreeFragment(fragment);
+
+    expect(JSON.parse(decoded)).toMatchObject({ v: 6, a: { "slot-1": ["r", 100, -27, 146, 12] } });
+    expect(restored.valid).toBe(true);
+    expect(restored.design.decorations[0]).toMatchObject({ rotX: -27, rotY: 146, rotation: 12 });
+  });
+
+  it("continues to decode previous v5 slot shares", () => {
+    const previous = btoa(JSON.stringify({ v: 5, d: { "slot-1": "r" }, a: { "slot-1": ["r", 120, 42] }, l: [1, "s", 80, 1] }))
+      .replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
+    const restored = decodeTreeFragment(`#tree=${previous}`);
+
+    expect(restored.valid).toBe(true);
+    expect(restored.design.decorations[0]).toMatchObject({ scale: 1.2, rotation: 42, rotX: 0, rotY: 0 });
   });
 
   it("stores configurable twinkling strand settings in the current share version", () => {

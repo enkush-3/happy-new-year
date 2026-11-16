@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Object3D } from "three";
+import { Group } from "three";
 import { downloadTreeGlb, treeModelCredits } from "./gltf-export";
 
 const exporterHarness = vi.hoisted(() => ({ scene: null as any, options: null as any, result: new ArrayBuffer(8) }));
@@ -54,5 +55,36 @@ describe("3D tree export", () => {
     const root = { clone: () => ({ userData: {} }) } as unknown as Object3D;
     await expect(downloadTreeGlb(root)).rejects.toThrow("GLB файл үүсгэж чадсангүй");
     exporterHarness.result = new ArrayBuffer(8);
+  });
+
+  it("keeps ornament rotations in the GLB scene and removes editor-only visuals", async () => {
+    const root = new Group();
+    const ornament = new Group();
+    ornament.name = "Selected bauble";
+    ornament.rotation.set(Math.PI / 6, -Math.PI / 4, 0.2, "YXZ");
+    ornament.userData.decoration = { rotX: 30, rotY: -45, rotation: 11 };
+    root.add(ornament);
+    const marker = new Group();
+    marker.name = "Empty slot marker";
+    marker.userData.emptySlotMarker = true;
+    root.add(marker);
+    const halo = new Group();
+    halo.name = "Selected ornament soft glow";
+    halo.userData.editorOnly = true;
+    root.add(halo);
+
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:tree-glb");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    vi.spyOn(window, "setTimeout").mockImplementation((callback) => { if (typeof callback === "function") callback(); return 1 as unknown as ReturnType<typeof window.setTimeout>; });
+
+    await downloadTreeGlb(root);
+
+    const exportedOrnament = exporterHarness.scene.getObjectByName("Selected bauble");
+    expect(exportedOrnament.rotation.x).toBeCloseTo(Math.PI / 6);
+    expect(exportedOrnament.rotation.y).toBeCloseTo(-Math.PI / 4);
+    expect(exportedOrnament.userData.decoration).toEqual({ rotX: 30, rotY: -45, rotation: 11 });
+    expect(exporterHarness.scene.getObjectByName("Empty slot marker")).toBeUndefined();
+    expect(exporterHarness.scene.getObjectByName("Selected ornament soft glow")).toBeUndefined();
   });
 });

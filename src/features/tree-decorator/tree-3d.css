@@ -6,7 +6,7 @@
 .tree-3d-shell.is-orbiting .tree-3d-canvas { touch-action: none; }
 .tree-3d-fallback { position: absolute; inset: 0; display: grid; place-items: center; }
 .tree-3d-status { position: absolute; z-index: 4; right: 12px; bottom: 12px; left: 12px; margin: 0; padding: 9px 13px; border: 1px solid rgba(230, 239, 255, .2); border-radius: 999px; color: #f8f2e6; background: rgba(11, 19, 32, .82); font-size: 12px; line-height: 1.4; text-align: center; pointer-events: none; }
-.tree-3d-instructions { position: absolute; right: 14px; bottom: 14px; left: 14px; max-width: 520px; margin: 0 auto; padding: 8px 12px; border-radius: 999px; color: #f7f0e2; background: rgba(11, 19, 32, .72); font-size: 11px; text-align: center; pointer-events: none; }
+.tree-3d-instructions { position: absolute; right: 16px; bottom: 16px; left: 16px; display: flex; max-width: 640px; flex-wrap: wrap; justify-content: center; margin: 0 auto; padding: 8px 16px; border-radius: 18px; box-sizing: border-box; color: #f7f0e2; background: rgba(11, 19, 32, .78); font-size: 11px; line-height: 1.45; text-align: center; pointer-events: none; }
 .tree-view-switch { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
 .tree-view-switch .tool-chip { flex: 1; }
 .tree-editor-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 13px; }
@@ -20,6 +20,7 @@
 @media (max-width: 640px) {
   .tree-editor-controls { grid-template-columns: 1fr 1fr; }
   .tree-3d-status { font-size: 11px; }
+  .tree-3d-instructions { right: 10px; bottom: 16px; left: 10px; padding: 7px 16px; font-size: 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .tree-3d-shell, .tree-3d-shell * { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }

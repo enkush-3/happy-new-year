@@ -6,7 +6,7 @@ import { decodeTreeFragment, DEFAULT_TREE_DESIGN } from "./model/tree-state";
 import { downloadTreeGlb } from "./services/gltf-export";
 import { downloadTreePng } from "./services/png-export";
 
-const sceneHarness = vi.hoisted(() => ({ root: { name: "fake tree root", userData: {} } }));
+const sceneHarness = vi.hoisted(() => ({ root: { name: "fake tree root", userData: {} }, markerVisibility: [] as boolean[], haloVisibility: [] as boolean[] }));
 
 vi.mock("./services/png-export", () => ({ downloadTreePng: vi.fn(async () => undefined) }));
 vi.mock("./services/gltf-export", () => ({ downloadTreeGlb: vi.fn(async () => undefined) }));
@@ -16,7 +16,10 @@ vi.mock("./components/Tree3DSceneSlots", async () => {
     default: (props: any) => {
       React.useEffect(() => {
         props.onExportRoot(sceneHarness.root);
-        props.onExportControls({ setMarkersVisible() {} });
+        props.onExportControls({
+          setMarkersVisible(visible: boolean) { sceneHarness.markerVisibility.push(visible); },
+          setSelectionHaloVisible(visible: boolean) { sceneHarness.haloVisibility.push(visible); },
+        });
         return () => { props.onExportRoot(null); props.onExportControls(null); };
       }, [props.onExportRoot, props.onExportControls]);
       return React.createElement("div", { role: "group", "aria-label": "3D гацуурыг чирж эргүүлэх; цэг дээр товшиж чимэглэх", "data-testid": "mock-tree-scene" },
@@ -37,6 +40,8 @@ describe("3D tree workshop", () => {
     window.history.replaceState(null, "", "/");
     window.localStorage.clear();
     vi.clearAllMocks();
+    sceneHarness.markerVisibility.length = 0;
+    sceneHarness.haloVisibility.length = 0;
   });
 
   it("shows only the interactive 3D tree editor", () => {
@@ -55,14 +60,14 @@ describe("3D tree workshop", () => {
     await user.click(screen.getByRole("button", { name: "Улаан бөмбөлөг сонгох" }));
     await user.click(screen.getByRole("button", { name: "Модон дээр байрлуулах" }));
 
-    expect(screen.getByText("✦ 1 / 29")).toBeInTheDocument();
+    expect(screen.getByText("✦ 1 / 37")).toBeInTheDocument();
     const shared = decodeTreeFragment(window.location.hash);
     expect(shared.valid).toBe(true);
     expect(shared.design.version).toBe(4);
     expect(shared.design.decorations[0]).toMatchObject({ slotId: "slot-1", kind: "bauble-red" });
     const encoded = window.location.hash.slice("#tree=".length).replaceAll("-", "+").replaceAll("_", "/");
     const compact = JSON.parse(atob(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, "=")));
-    expect(compact).toMatchObject({ v: 5, d: { "slot-1": "r" } });
+    expect(compact).toMatchObject({ v: 6, d: { "slot-1": "r" } });
     expect(shared.design.lights).toEqual(DEFAULT_TREE_DESIGN.lights);
   });
 
@@ -71,7 +76,6 @@ describe("3D tree workshop", () => {
     render(<TreeGame />);
     await user.click(screen.getByRole("button", { name: "Алтан од сонгох" }));
     await user.click(screen.getByRole("button", { name: "Модон дээр байрлуулах" }));
-    await user.click(screen.getByText("Нарийн тохиргоо"));
     await user.click(screen.getByRole("button", { name: "Томруулах" }));
     await user.click(screen.getByRole("button", { name: "Мөсөн цэнхэр өнгө" }));
     expect(decodeTreeFragment(window.location.hash).design.decorations[0]).toMatchObject({ slotId: "slot-0", scale: 1.1, color: "#98d8f2" });
@@ -89,7 +93,24 @@ describe("3D tree workshop", () => {
     await user.click(screen.getByRole("button", { name: "Модон дээр байрлуулах" }));
     await user.click(screen.getByRole("button", { name: /Сонгох ба нарийн засах/ }));
     await user.click(screen.getByRole("button", { name: "Мөчрийн чимэглэлийг сонгох" }));
-    expect(screen.getByText("Нарийн тохиргоо")).toBeInTheDocument();
+    expect(screen.getByText("Чимэглэлийн өнцөг тааруулах")).toBeInTheDocument();
+  });
+
+  it("applies 1-degree rotation controls to the selected ornament and new placements", async () => {
+    const user = userEvent.setup();
+    render(<TreeGame />);
+
+    fireEvent.change(screen.getByRole("slider", { name: "Хөндлөн өнцөг" }), { target: { value: "41" } });
+    await user.click(screen.getByRole("button", { name: "Улаан бөмбөлөг сонгох" }));
+    await user.click(screen.getByRole("button", { name: "Модон дээр байрлуулах" }));
+    expect(decodeTreeFragment(window.location.hash).design.decorations[0]).toMatchObject({ rotX: 0, rotY: 41 });
+
+    fireEvent.change(screen.getByRole("slider", { name: "Босоо өнцөг" }), { target: { value: "-17" } });
+    expect(decodeTreeFragment(window.location.hash).design.decorations[0]).toMatchObject({ rotX: -17, rotY: 41 });
+    await user.click(screen.getByRole("button", { name: "Хөндлөн өнцгийг 1°-аар нэмэх" }));
+    expect(decodeTreeFragment(window.location.hash).design.decorations[0]).toMatchObject({ rotX: -17, rotY: 42 });
+    await user.click(screen.getByRole("button", { name: "↺ Тэглэх" }));
+    expect(decodeTreeFragment(window.location.hash).design.decorations[0]).toMatchObject({ rotX: 0, rotY: 0 });
   });
 
   it("toggles, recolors, dims, and shares the animated light settings", async () => {
@@ -138,6 +159,8 @@ describe("3D tree workshop", () => {
     render(<TreeGame />);
     await user.click(screen.getByRole("button", { name: /PNG зураг татах/ }));
     await waitFor(() => expect(downloadTreePng).toHaveBeenCalledOnce());
+    expect(sceneHarness.markerVisibility).toEqual([false, true]);
+    expect(sceneHarness.haloVisibility).toEqual([false, true]);
     await user.click(screen.getByRole("button", { name: /3D GLB татах/ }));
     await waitFor(() => expect(downloadTreeGlb).toHaveBeenCalledWith(sceneHarness.root));
     expect(screen.getByRole("button", { name: /3D GLB татах/ })).toBeEnabled();
@@ -150,7 +173,7 @@ describe("3D tree workshop", () => {
     render(<TreeGame />);
 
     expect(screen.getByText(/гараар зурсан хэсгийг цэвэрлэлээ/i)).toBeInTheDocument();
-    expect(screen.getByText("✦ 1 / 29")).toBeInTheDocument();
+    expect(screen.getByText("✦ 1 / 37")).toBeInTheDocument();
     expect(decodeTreeFragment(window.location.hash).design.decorations).toHaveLength(1);
   });
 

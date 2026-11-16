@@ -17,6 +17,10 @@ export interface TreeDecoration {
   radius: number;
   /** Rotation around the ornament's center, in degrees. */
   rotation: number;
+  /** Pitch around the local X axis, in degrees. */
+  rotX?: number;
+  /** Yaw around the local Y axis, in degrees. */
+  rotY?: number;
   /** Relative size. */
   scale: number;
   color: OrnamentColor;
@@ -48,26 +52,46 @@ export interface TreeSlot {
   normal: readonly [number, number, number];
 }
 
-/** The radii are fitted to the bundled GLB's canopy and the fallback foliage geometry. */
+export interface TreeConeTier {
+  tier: Exclude<TreeSlot["tier"], "topper">;
+  top: number;
+  bottom: number;
+  radius: number;
+  tint: number;
+  slotCount: number;
+  slotOffset: number;
+  branchY: number;
+  branchTipY: number;
+  branchRadius: number;
+  branchCount: number;
+  branchWidth: number;
+}
+
+/** Shared geometry keeps the slot rings exactly on the four procedural cone rims. */
+export const TREE_CONE_TIERS: readonly TreeConeTier[] = Object.freeze([
+  { tier: "upper", top: 1.11, bottom: 0.25, radius: 0.39, tint: 1.06, slotCount: 6, slotOffset: 0, branchY: 0.69, branchTipY: 0.34, branchRadius: 0.43, branchCount: 10, branchWidth: 0.13 },
+  { tier: "mid-upper", top: 0.58, bottom: -0.2, radius: 0.57, tint: 0.95, slotCount: 8, slotOffset: Math.PI / 8, branchY: 0.18, branchTipY: -0.2, branchRadius: 0.61, branchCount: 12, branchWidth: 0.16 },
+  { tier: "mid-lower", top: 0.02, bottom: -0.67, radius: 0.75, tint: 0.87, slotCount: 10, slotOffset: Math.PI / 10, branchY: -0.34, branchTipY: -0.72, branchRadius: 0.79, branchCount: 14, branchWidth: 0.18 },
+  { tier: "bottom", top: -0.45, bottom: -1.13, radius: 0.89, tint: 0.78, slotCount: 12, slotOffset: 0, branchY: -0.79, branchTipY: -1.16, branchRadius: 0.94, branchCount: 16, branchWidth: 0.2 },
+]);
+
 export const TREE_SLOTS: readonly TreeSlot[] = (() => {
   const slots: TreeSlot[] = [{ id: "slot-0", tier: "topper", position: [0, 1.19, 0], normal: [0, 1, 0] }];
-  const tiers = [
-    { tier: "upper" as const, y: 0.69, radius: 0.19, count: 4, offset: 0 },
-    { tier: "mid-upper" as const, y: 0.12, radius: 0.32, count: 6, offset: Math.PI / 6 },
-    { tier: "mid-lower" as const, y: -0.48, radius: 0.51, count: 8, offset: Math.PI / 8 },
-    { tier: "bottom" as const, y: -0.97, radius: 0.68, count: 10, offset: 0 },
-  ];
   let index = 1;
-  for (const tier of tiers) {
-    for (let point = 0; point < tier.count; point += 1) {
-      const angle = (point / tier.count) * Math.PI * 2 + tier.offset;
+  for (const tier of TREE_CONE_TIERS) {
+    const coneCenterY = (tier.top + tier.bottom) / 2;
+    const coneHeight = tier.top - tier.bottom;
+    const baseY = coneCenterY - coneHeight / 2;
+    const rimRadius = tier.radius * 0.95;
+    for (let point = 0; point < tier.slotCount; point += 1) {
+      const angle = (point / tier.slotCount) * Math.PI * 2 + tier.slotOffset;
       const nx = Math.cos(angle);
       const nz = Math.sin(angle);
       slots.push({
         id: `slot-${index++}`,
         tier: tier.tier,
-        position: [Number((nx * tier.radius).toFixed(3)), tier.y, Number((nz * tier.radius).toFixed(3))],
-        normal: [Number((nx * 0.82).toFixed(3)), 0.42, Number((nz * 0.82).toFixed(3))],
+        position: [nx * rimRadius, baseY, nz * rimRadius],
+        normal: [Number((nx * 0.82).toFixed(3)), 0.25, Number((nz * 0.82).toFixed(3))],
       });
     }
   }
@@ -165,6 +189,8 @@ export function decorationForSlot(slotId: string, kind: OrnamentKind): TreeDecor
     angle,
     radius: clamp(Math.hypot(x, z) / 0.86, 0.02, 1),
     rotation: 0,
+    rotX: 0,
+    rotY: 0,
     scale: 1,
     color: defaultOrnamentColor[kind],
   };
@@ -205,7 +231,7 @@ export function normalizeTreeForSlots(design: TreeDesign): TreeDesign {
     const next = decorationForSlot(slotId, kind);
     if (!next) continue;
     occupied.add(slotId);
-    migrated.push({ ...next, color: original.color, rotation: original.rotation, scale: original.scale });
+    migrated.push({ ...next, color: original.color, rotation: original.rotation, rotX: original.rotX ?? 0, rotY: original.rotY ?? 0, scale: original.scale });
     if (migrated.length === TREE_SLOTS.length) break;
   }
   return { ...design, decorations: migrated };
@@ -227,7 +253,12 @@ function slotScore(slot: TreeSlot, targetY: number, targetAngle: number): number
   return Math.abs(y - targetY) + angularDistance * 0.2;
 }
 
-export function setSlotDecoration(design: TreeDesign, slotId: string, kind: OrnamentKind | null): TreeDesign {
+export function setSlotDecoration(
+  design: TreeDesign,
+  slotId: string,
+  kind: OrnamentKind | null,
+  rotationPreset: Pick<TreeDecoration, "rotX" | "rotY"> = { rotX: 0, rotY: 0 },
+): TreeDesign {
   const slot = TREE_SLOTS.find((candidate) => candidate.id === slotId);
   if (!slot) return design;
   const current = design.decorations.find((decoration) => getDecorationSlotId(decoration) === slotId);
@@ -235,8 +266,9 @@ export function setSlotDecoration(design: TreeDesign, slotId: string, kind: Orna
     if (!current) return design;
     return { ...design, decorations: design.decorations.filter((decoration) => decoration.id !== current.id) };
   }
-  const next = decorationForSlot(slotId, kind);
-  if (!next) return design;
+  const slotDecoration = decorationForSlot(slotId, kind);
+  if (!slotDecoration) return design;
+  const next = { ...slotDecoration, rotX: rotationPreset.rotX ?? 0, rotY: rotationPreset.rotY ?? 0 };
   const decorations = design.decorations.filter((decoration) => getDecorationSlotId(decoration) !== slotId);
   if (decorations.length >= TREE_SLOTS.length) return design;
   return { ...design, decorations: [...decorations, next] };
@@ -261,7 +293,7 @@ export function moveDecoration(design: TreeDesign, id: string, x: number, y: num
 export function transformDecoration(
   design: TreeDesign,
   id: string,
-  transform: Partial<Pick<TreeDecoration, "rotation" | "scale" | "color">>,
+  transform: Partial<Pick<TreeDecoration, "rotation" | "rotX" | "rotY" | "scale" | "color">>,
 ): TreeDesign {
   const index = design.decorations.findIndex((decoration) => decoration.id === id);
   if (index < 0) return design;
@@ -293,14 +325,19 @@ export function removeDecoration(design: TreeDesign, id: string): TreeDesign {
 
 export function encodeTreeFragment(design: TreeDesign): string {
   if (!isTreeDesign(design)) throw new Error("Модны өгөгдөл буруу байна.");
-  const usesSlotFormat = Boolean(design.theme) || design.decorations.some((decoration) => decoration.slotId);
+  const usesSlotFormat = Boolean(design.theme) || design.decorations.some((decoration) =>
+    decoration.slotId || decoration.rotX !== undefined || decoration.rotY !== undefined,
+  );
   const json = JSON.stringify(usesSlotFormat ? {
-    v: 5,
+    v: 6,
     d: Object.fromEntries(design.decorations.map((decoration) => [getDecorationSlotId(decoration), compactKindCode[decoration.kind]])),
     ...(() => {
       const appearance = Object.fromEntries(design.decorations
-        .filter((decoration) => decoration.color !== defaultOrnamentColor[decoration.kind] || decoration.scale !== 1 || decoration.rotation !== 0)
-        .map((decoration) => [getDecorationSlotId(decoration), [encodeColor(decoration.color), Math.round(decoration.scale * 100), Math.round(decoration.rotation)]]));
+        .filter((decoration) => decoration.color !== defaultOrnamentColor[decoration.kind] || decoration.scale !== 1 || decoration.rotation !== 0 || (decoration.rotX ?? 0) !== 0 || (decoration.rotY ?? 0) !== 0)
+        .map((decoration) => [getDecorationSlotId(decoration), [
+          encodeColor(decoration.color), Math.round(decoration.scale * 100),
+          Math.round(decoration.rotX ?? 0), Math.round(decoration.rotY ?? 0), Math.round(decoration.rotation),
+        ]]));
       return Object.keys(appearance).length ? { a: appearance } : {};
     })(),
     ...(design.theme && design.theme !== "classic-green" ? { t: treeThemeCode[design.theme] } : {}),
@@ -354,7 +391,7 @@ export function decodeTreeFragment(fragment: string): { design: TreeDesign; vali
 function expandCompactDesign(value: unknown): TreeDesign | null {
   if (!value || typeof value !== "object") return null;
   const payload = value as { v?: unknown; m?: unknown; d?: unknown; s?: unknown; l?: unknown };
-  if (payload.v === 5) {
+  if (payload.v === 5 || payload.v === 6) {
     if (!payload.d || typeof payload.d !== "object" || Array.isArray(payload.d) || !Array.isArray(payload.l)) return null;
     const entries = Object.entries(payload.d as Record<string, unknown>);
     const appearance = (payload as { a?: unknown }).a;
@@ -373,11 +410,16 @@ function expandCompactDesign(value: unknown): TreeDesign | null {
         decorations.push(decoration);
         continue;
       }
-      if (!Array.isArray(style) || style.length !== 3) return null;
-      const [colorCode, scale, rotation] = style;
+      const expectedStyleLength = payload.v === 5 ? 3 : 5;
+      if (!Array.isArray(style) || style.length !== expectedStyleLength) return null;
+      const [colorCode, scale] = style;
+      const rotation = payload.v === 5 ? style[2] : style[4];
+      const rotX = payload.v === 6 ? style[2] : 0;
+      const rotY = payload.v === 6 ? style[3] : 0;
       const color = typeof colorCode === "string" ? decodeColor(colorCode) : undefined;
-      if (!color || !isIntInRange(scale, 60, 160) || !isIntInRange(rotation, -180, 180)) return null;
-      decorations.push({ ...decoration, color, scale: scale / 100, rotation });
+      if (!color || !isIntInRange(scale, 60, 160) || !isIntInRange(rotation, -180, 180) ||
+        !isIntInRange(rotX, -180, 180) || !isIntInRange(rotY, -180, 180)) return null;
+      decorations.push({ ...decoration, color, scale: scale / 100, rotation, rotX, rotY });
     }
     if (appearance && typeof appearance === "object" && Object.keys(appearance).some((slotId) => !entries.some(([id]) => id === slotId))) return null;
     const themeCode = (payload as { t?: unknown }).t;
@@ -591,6 +633,8 @@ function isDecoration(value: unknown): value is TreeDecoration {
     typeof decoration.angle === "number" && Number.isFinite(decoration.angle) && decoration.angle >= 0 && decoration.angle <= 1 &&
     typeof decoration.radius === "number" && Number.isFinite(decoration.radius) && decoration.radius >= 0.02 && decoration.radius <= 1 &&
     typeof decoration.rotation === "number" && Number.isFinite(decoration.rotation) && decoration.rotation >= -180 && decoration.rotation <= 180 &&
+    (decoration.rotX === undefined || (typeof decoration.rotX === "number" && Number.isFinite(decoration.rotX) && decoration.rotX >= -180 && decoration.rotX <= 180)) &&
+    (decoration.rotY === undefined || (typeof decoration.rotY === "number" && Number.isFinite(decoration.rotY) && decoration.rotY >= -180 && decoration.rotY <= 180)) &&
     typeof decoration.scale === "number" && Number.isFinite(decoration.scale) && decoration.scale >= 0.6 && decoration.scale <= 1.6 &&
     ornamentColors.has(decoration.color as OrnamentColor)
   );

@@ -19,7 +19,7 @@ export async function downloadTreeGlb(root: Object3D | null): Promise<void> {
   const editorMarkers: Object3D[] = [];
   if (typeof exportRoot.traverse === "function") {
     exportRoot.traverse((object) => {
-      if (object.userData.emptySlotMarker === true) editorMarkers.push(object);
+      if (object.userData.emptySlotMarker === true || object.userData.editorOnly === true) editorMarkers.push(object);
     });
   }
   editorMarkers.forEach((object) => object.parent?.remove(object));
