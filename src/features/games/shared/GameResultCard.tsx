@@ -58,9 +58,9 @@ export default function GameResultCard({ result, bestRecords, nextGame, onReplay
         ))}
       </dl>
       <div className="game-result-actions">
-        <button className="button button--primary" type="button" onClick={onReplay}>Дахин тоглох</button>
+        <button className="button button--primary ui-btn" type="button" onClick={onReplay}>Дахин тоглох</button>
         <ShareButton result={result} />
-        <Link className="button button--secondary" to={gamePath(nextGame.id)}>
+        <Link className="button button--secondary ui-btn" to={gamePath(nextGame.id)}>
           Дараагийн тоглоом: {nextGame.title} <span aria-hidden="true">→</span>
         </Link>
       </div>

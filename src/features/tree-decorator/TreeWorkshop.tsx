@@ -370,14 +370,14 @@ export default function TreeWorkshop() {
         <section className="tree-workshop__canvas-card" aria-label="3D гацуурын ажлын талбар">
           <div className="tree-workshop__canvas-heading">
             <div><span>ТАНЫ ШИНЭ ЖИЛИЙН МОД</span><h2>Өөрийнхөөрөө бүтээ</h2></div>
-            <span className="tree-workshop__count">✦ {design.decorations.length} / {TREE_SLOTS.length}</span>
+            <span key={design.decorations.length} className="tree-workshop__count ui-pop-in">✦ {design.decorations.length} / {TREE_SLOTS.length}</span>
           </div>
 
           <div className="tree-workshop__toolbar" role="group" aria-label="Гацуурын хэрэгсэл">
-            <button className="tree-tool tree-tool--primary" type="button" onClick={autoDecorate}>🪄 <span>Автоматаар чимэглэх</span></button>
-            <button className="tree-tool" type="button" onClick={undo} disabled={!history.past.length}>↶ <span>Буцаах</span></button>
-            <button className="tree-tool" type="button" aria-pressed={showSlots} onClick={() => setShowSlots((visible) => !visible)}>◉ <span>{showSlots ? "Цэг нуух" : "Цэг харуулах"}</span></button>
-            <button className="tree-tool" type="button" onClick={clearDecorations}>⌫ <span>Бүгдийг цэвэрлэх</span></button>
+            <button className="tree-tool tree-tool--primary ui-btn" type="button" onClick={autoDecorate}>🪄 <span>Автоматаар чимэглэх</span></button>
+            <button className="tree-tool ui-btn" type="button" onClick={undo} disabled={!history.past.length}>↶ <span>Буцаах</span></button>
+            <button className="tree-tool ui-btn" type="button" aria-pressed={showSlots} onClick={() => setShowSlots((visible) => !visible)}>◉ <span>{showSlots ? "Цэг нуух" : "Цэг харуулах"}</span></button>
+            <button className="tree-tool ui-btn" type="button" onClick={clearDecorations}>⌫ <span>Бүгдийг цэвэрлэх</span></button>
           </div>
 
           <div className="tree-workshop__stage">
@@ -416,24 +416,24 @@ export default function TreeWorkshop() {
             <div className="tree-workshop__panel-title"><span aria-hidden="true">✧</span><div><h2 id="ornament-title">Чимэглэл сонгох</h2><p>Цэгт товшиход сууж, дахин товшиход авна</p></div></div>
             <div className="tree-workshop__palette" role="group" aria-label="Чимэглэлийн төрөл">
               {decorations.map((item) => (
-                <button key={item.kind} className={"tree-workshop__ornament" + (tool === item.kind ? " is-active" : "")} type="button" aria-label={item.label + " сонгох"} aria-pressed={tool === item.kind} onClick={() => { setTool(item.kind); setSelectedDecorationId(null); setNotice(item.kind === "star" ? "Алтан одыг зөвхөн оройн цэгт байрлуулна." : item.label + " сонголоо. Модон дээр тохирох цэгээ товшино уу."); }}>
+                <button key={item.kind} className={"tree-workshop__ornament ui-btn" + (tool === item.kind ? " is-active" : "")} type="button" aria-label={item.label + " сонгох"} aria-pressed={tool === item.kind} onClick={() => { setTool(item.kind); setSelectedDecorationId(null); setNotice(item.kind === "star" ? "Алтан одыг зөвхөн оройн цэгт байрлуулна." : item.label + " сонголоо. Модон дээр тохирох цэгээ товшино уу."); }}>
                   <span style={{ color: item.color }} aria-hidden="true">{item.icon}</span><small>{item.label}</small>
                 </button>
               ))}
-              <button className={"tree-workshop__ornament tree-workshop__ornament--eraser" + (tool === "eraser" ? " is-active" : "")} type="button" aria-label="Устгагч сонгох" aria-pressed={tool === "eraser"} onClick={() => { setTool("eraser"); setSelectedDecorationId(null); setNotice("Авах чимэглэлийн цэг дээр товшино уу."); }}><span aria-hidden="true">{eraserItem.icon}</span><small>{eraserItem.label}</small></button>
+              <button className={"tree-workshop__ornament tree-workshop__ornament--eraser ui-btn" + (tool === "eraser" ? " is-active" : "")} type="button" aria-label="Устгагч сонгох" aria-pressed={tool === "eraser"} onClick={() => { setTool("eraser"); setSelectedDecorationId(null); setNotice("Авах чимэглэлийн цэг дээр товшино уу."); }}><span aria-hidden="true">{eraserItem.icon}</span><small>{eraserItem.label}</small></button>
             </div>
-            <button className="tree-workshop__select-mode" type="button" aria-pressed={tool === null} onClick={() => { setTool(null); setSelectedDecorationId(null); setNotice("Сонгох горимд орлоо. Модон дээрх чимэглэлээ товшоод нарийн тохиргоог нээнэ үү."); }}>⌖ <span>Сонгох ба нарийн засах</span></button>
+            <button className="tree-workshop__select-mode ui-btn" type="button" aria-pressed={tool === null} onClick={() => { setTool(null); setSelectedDecorationId(null); setNotice("Сонгох горимд орлоо. Модон дээрх чимэглэлээ товшоод нарийн тохиргоог нээнэ үү."); }}>⌖ <span>Сонгох ба нарийн засах</span></button>
           </section>
 
           <section className="tree-workshop__panel" aria-labelledby="edit-decoration-title">
             <div className="tree-workshop__panel-title"><span aria-hidden="true">✎</span><div><h2 id="edit-decoration-title">Чимэглэл засах</h2><p>{selectedDecoration ? "Сонгосон чимэглэлийн өнцөг, өнгө, хэмжээг тохируулна" : "Чимэглэл сонгоод нарийн тохиргоог ашиглаарай"}</p></div></div>
             {selectedDecoration ? (
-              <div className="tree-workshop__selected" role="group" aria-label="Сонгосон чимэглэл"><span style={{ color: selectedDecoration.color }} aria-hidden="true">{selectedPaletteItem?.icon ?? "✦"}</span><div><strong>{selectedPaletteItem?.label ?? "Чимэглэл"}</strong><small>{selectedDecoration.slotId ?? getDecorationSlotId(selectedDecoration)} байрлал</small></div><button type="button" aria-label="Сонгосон чимэглэлийг устгах" onClick={removeSelected}>Устгах</button></div>
+              <div className="tree-workshop__selected" role="group" aria-label="Сонгосон чимэглэл"><span style={{ color: selectedDecoration.color }} aria-hidden="true">{selectedPaletteItem?.icon ?? "✦"}</span><div><strong>{selectedPaletteItem?.label ?? "Чимэглэл"}</strong><small>{selectedDecoration.slotId ?? getDecorationSlotId(selectedDecoration)} байрлал</small></div><button className="ui-btn" type="button" aria-label="Сонгосон чимэглэлийг устгах" onClick={removeSelected}>Устгах</button></div>
             ) : <p className="tree-workshop__empty-selection">Модон дээрх чимэглэлээ товшиж сонгоно уу.</p>}
             <section className="tree-workshop__angle-panel" aria-labelledby="ornament-angle-title">
               <div className="tree-workshop__angle-heading">
                 <h3 id="ornament-angle-title">Чимэглэлийн өнцөг тааруулах</h3>
-                <button className="tree-workshop__angle-reset" type="button" onClick={resetRotation}>↺ Тэглэх</button>
+                <button className="tree-workshop__angle-reset ui-btn" type="button" onClick={resetRotation}>↺ Тэглэх</button>
               </div>
               {([
                 ["rotY", "Хөндлөн", "Зүүн / баруун"],
@@ -442,28 +442,28 @@ export default function TreeWorkshop() {
                 <div className="tree-workshop__angle-row" key={axis}>
                   <label htmlFor={`tree-angle-${axis}`}><span>{label}</span><output className="tree-workshop__angle-value">{angleValues[axis]}°</output></label>
                   <div className="tree-workshop__angle-controls">
-                    <button type="button" aria-label={`${label} өнцгийг 1°-аар багасгах`} disabled={angleValues[axis] <= -180} onClick={() => changeRotation(axis, angleValues[axis] - 1)}>−1°</button>
+                    <button className="ui-btn" type="button" aria-label={`${label} өнцгийг 1°-аар багасгах`} disabled={angleValues[axis] <= -180} onClick={() => changeRotation(axis, angleValues[axis] - 1)}>−1°</button>
                     <input id={`tree-angle-${axis}`} aria-label={`${label} өнцөг`} type="range" min="-180" max="180" step="1" value={angleValues[axis]} onChange={(event) => changeRotation(axis, Number(event.currentTarget.value))} />
-                    <button type="button" aria-label={`${label} өнцгийг 1°-аар нэмэх`} disabled={angleValues[axis] >= 180} onClick={() => changeRotation(axis, angleValues[axis] + 1)}>+1°</button>
+                    <button className="ui-btn" type="button" aria-label={`${label} өнцгийг 1°-аар нэмэх`} disabled={angleValues[axis] >= 180} onClick={() => changeRotation(axis, angleValues[axis] + 1)}>+1°</button>
                   </div>
                   <small>{hint}</small>
                 </div>
               ))}
             </section>
-            {selectedDecoration && <details className="tree-workshop__advanced" open><summary>Өнгө ба хэмжээ</summary><div className="tree-workshop__advanced-actions"><button type="button" disabled={selectedDecoration.scale <= 0.6} onClick={() => changeSelected({ scale: Math.max(0.6, selectedDecoration.scale - 0.1) }, "Чимэглэлийг жижгэрүүллээ.")}>Жижигрүүлэх</button><button type="button" disabled={selectedDecoration.scale >= 1.6} onClick={() => changeSelected({ scale: Math.min(1.6, selectedDecoration.scale + 0.1) }, "Чимэглэлийг томрууллаа.")}>Томруулах</button></div><div className="tree-workshop__advanced-colors" role="group" aria-label="Чимэглэлийн өнгө">{ornamentColors.map((item) => <button key={item.color} type="button" aria-label={item.label + " өнгө"} aria-pressed={selectedDecoration.color === item.color} className={selectedDecoration.color === item.color ? "is-active" : ""} style={{ backgroundColor: item.color }} onClick={() => changeSelected({ color: item.color }, item.label + " өнгөөр сольлоо.")} />)}</div></details>}
-            <details className="tree-workshop__slot-list"><summary>Байрлалыг жагсаалтаас сонгох</summary><div>{TREE_SLOTS.map((slot, index) => <button type="button" key={slot.id} onClick={() => clickSlot(slot.id)}>{slot.tier === "topper" ? "Оройн од" : "Мөчир " + index}{design.decorations.some((item) => getDecorationSlotId(item) === slot.id) ? " · дүүрсэн" : " · хоосон"}</button>)}</div></details>
+            {selectedDecoration && <details className="tree-workshop__advanced" open><summary>Өнгө ба хэмжээ</summary><div className="tree-workshop__advanced-actions"><button className="ui-btn" type="button" disabled={selectedDecoration.scale <= 0.6} onClick={() => changeSelected({ scale: Math.max(0.6, selectedDecoration.scale - 0.1) }, "Чимэглэлийг жижгэрүүллээ.")}>Жижигрүүлэх</button><button className="ui-btn" type="button" disabled={selectedDecoration.scale >= 1.6} onClick={() => changeSelected({ scale: Math.min(1.6, selectedDecoration.scale + 0.1) }, "Чимэглэлийг томрууллаа.")}>Томруулах</button></div><div className="tree-workshop__advanced-colors" role="group" aria-label="Чимэглэлийн өнгө">{ornamentColors.map((item) => <button key={item.color} type="button" aria-label={item.label + " өнгө"} aria-pressed={selectedDecoration.color === item.color} className={"ui-btn" + (selectedDecoration.color === item.color ? " is-active" : "")} style={{ backgroundColor: item.color }} onClick={() => changeSelected({ color: item.color }, item.label + " өнгөөр сольлоо.")} />)}</div></details>}
+            <details className="tree-workshop__slot-list"><summary>Байрлалыг жагсаалтаас сонгох</summary><div>{TREE_SLOTS.map((slot, index) => <button className="ui-btn" type="button" key={slot.id} onClick={() => clickSlot(slot.id)}>{slot.tier === "topper" ? "Оройн од" : "Мөчир " + index}{design.decorations.some((item) => getDecorationSlotId(item) === slot.id) ? " · дүүрсэн" : " · хоосон"}</button>)}</div></details>
           </section>
 
           <section className="tree-workshop__panel" aria-labelledby="appearance-title">
             <div className="tree-workshop__panel-title"><span aria-hidden="true">🌲</span><div><h2 id="appearance-title">Модны төрх</h2><p>Өнгө болон гэрэлтүүлгийг тохируулна</p></div></div>
             <h3 className="tree-workshop__subheading" id="theme-title">Модны өнгө</h3>
             <div className="tree-workshop__themes" role="group" aria-label="Гацуурын өнгө">
-              {TREE_THEMES.map((theme) => <button key={theme.id} className={(design.theme ?? "classic-green") === theme.id ? "is-active" : ""} type="button" aria-label={theme.label} aria-pressed={(design.theme ?? "classic-green") === theme.id} onClick={() => updateTheme(theme.id)}><i style={{ backgroundColor: theme.color }} />{theme.label}</button>)}
+              {TREE_THEMES.map((theme) => <button key={theme.id} className={"ui-btn" + ((design.theme ?? "classic-green") === theme.id ? " is-active" : "")} type="button" aria-label={theme.label} aria-pressed={(design.theme ?? "classic-green") === theme.id} onClick={() => updateTheme(theme.id)}><i style={{ backgroundColor: theme.color }} />{theme.label}</button>)}
             </div>
 
             <h3 className="tree-workshop__subheading tree-workshop__subheading--lights" id="lights-title">Гэрлэн чимэглэл</h3>
             <label className="tree-workshop__toggle"><input type="checkbox" checked={design.lights.enabled} onChange={(event) => updateLights({ enabled: event.currentTarget.checked }, event.currentTarget.checked ? "Гэрлэн чимэглэлийг асаалаа." : "Гэрлэн чимэглэлийг унтраалаа.")} /> Гэрлийг асаах</label>
-            <div className="tree-workshop__light-colors" role="group" aria-label="Гэрлийн өнгө">{lightColors.map((light) => <button key={light.color} className={design.lights.color === light.color ? "is-active" : ""} style={{ background: light.color }} type="button" aria-label={light.label + " гэрэл"} aria-pressed={design.lights.color === light.color} disabled={!design.lights.enabled} onClick={() => updateLights({ color: light.color }, light.label + " гэрэл сонголоо.")} />)}</div>
+            <div className="tree-workshop__light-colors" role="group" aria-label="Гэрлийн өнгө">{lightColors.map((light) => <button key={light.color} className={"ui-btn" + (design.lights.color === light.color ? " is-active" : "")} style={{ backgroundColor: light.color }} type="button" aria-label={light.label + " гэрэл"} aria-pressed={design.lights.color === light.color} disabled={!design.lights.enabled} onClick={() => updateLights({ color: light.color }, light.label + " гэрэл сонголоо.")} />)}</div>
             <label className="tree-workshop__range">Гэрлийн тод байдал <output>{Math.round(design.lights.brightness * 100)}%</output><input aria-label="Гэрлийн тод байдал" type="range" min="0.2" max="1" step="0.05" value={design.lights.brightness} disabled={!design.lights.enabled} onChange={(event) => updateLights({ brightness: Number(event.currentTarget.value) }, "Гэрлийн тод байдлыг тохирууллаа.")} /></label>
             <label className="tree-workshop__toggle tree-workshop__toggle--subtle"><input type="checkbox" checked={design.lights.twinkle} disabled={!design.lights.enabled} onChange={(event) => updateLights({ twinkle: event.currentTarget.checked }, event.currentTarget.checked ? "Гэрлийн анивчилтыг асаалаа." : "Гэрлийн анивчилтыг унтраалаа.")} /> Зөөлөн анивчилт</label>
           </section>
@@ -471,12 +471,12 @@ export default function TreeWorkshop() {
           <section className="tree-workshop__panel" aria-labelledby="share-tree-title">
             <div className="tree-workshop__panel-title"><span aria-hidden="true">♡</span><div><h2 id="share-tree-title">Модоо хуваалцах</h2><p>Линк, PNG зураг эсвэл 3D загвар татах</p></div></div>
             <div className="tree-workshop__share-actions">
-              <button className="tree-action tree-action--primary" type="button" aria-label="Хуваалцах" onClick={shareTree}>↗ <span>Хуваалцах</span></button>
-              <button className="tree-action" type="button" aria-label="Линк хуулах" onClick={copyShareLink}>⧉ <span>Линк хуулах</span></button>
-              <button className="tree-action" type="button" aria-label={downloadStatus === "png" ? "PNG зураг бэлдэж байна" : "PNG зураг татах"} disabled={downloadStatus !== "idle"} onClick={savePng}>↓ <span>{downloadStatus === "png" ? "Бэлдэж байна…" : "PNG зураг татах"}</span></button>
-              <button className="tree-action" type="button" aria-label={downloadStatus === "glb" ? "3D GLB бэлдэж байна" : "3D GLB татах"} disabled={downloadStatus !== "idle"} onClick={saveGlb}>▣ <span>{downloadStatus === "glb" ? "Бэлдэж байна…" : "3D GLB татах"}</span></button>
-              <button className="tree-action tree-action--quiet" type="button" onClick={redo} disabled={!history.future.length}>↷ <span>Дахин хийх</span></button>
-              <button className="tree-action tree-action--quiet" type="button" onClick={resetTree}>↻ <span>Шинээр эхлэх</span></button>
+              <button className="tree-action tree-action--primary ui-btn" type="button" aria-label="Хуваалцах" onClick={shareTree}>↗ <span>Хуваалцах</span></button>
+              <button className="tree-action ui-btn" type="button" aria-label="Линк хуулах" onClick={copyShareLink}>⧉ <span>Линк хуулах</span></button>
+              <button className="tree-action ui-btn" type="button" aria-label={downloadStatus === "png" ? "PNG зураг бэлдэж байна" : "PNG зураг татах"} disabled={downloadStatus !== "idle"} onClick={savePng}>↓ <span>{downloadStatus === "png" ? "Бэлдэж байна…" : "PNG зураг татах"}</span></button>
+              <button className="tree-action ui-btn" type="button" aria-label={downloadStatus === "glb" ? "3D GLB бэлдэж байна" : "3D GLB татах"} disabled={downloadStatus !== "idle"} onClick={saveGlb}>▣ <span>{downloadStatus === "glb" ? "Бэлдэж байна…" : "3D GLB татах"}</span></button>
+              <button className="tree-action tree-action--quiet ui-btn" type="button" onClick={redo} disabled={!history.future.length}>↷ <span>Дахин хийх</span></button>
+              <button className="tree-action tree-action--quiet ui-btn" type="button" onClick={resetTree}>↻ <span>Шинээр эхлэх</span></button>
             </div>
             {showShareLink && <div className="tree-workshop__share-field"><label htmlFor="tree-share-link">Модны share линк</label><input id="tree-share-link" type="url" readOnly value={shareLink} onFocus={(event) => event.currentTarget.select()} /></div>}
           </section>

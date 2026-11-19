@@ -37,7 +37,7 @@ export default function GamePage() {
         <p className="eyebrow">❄ ӨВЛИЙН УРЛАН</p>
         <h1>Тоглоом олдсонгүй</h1>
         <p>Энэ тоглоомын хаяг байхгүй байна.</p>
-        <Link className="button button--primary" to="/games">Тоглоомууд руу буцах</Link>
+        <Link className="button button--primary ui-btn" to="/games">Тоглоомууд руу буцах</Link>
       </section>
     );
   }

@@ -194,11 +194,11 @@ export default function SleighRunnerGame({ onComplete }: SleighRunnerGameProps) 
       <p className="runner-hint">Space, ↑, товшилт эсвэл “Үсрэх” товчоор харайна</p>
       <div className="runner-controls">
         {game.status === "running" ? (
-          <button className="runner-button runner-button--primary runner-button--jump" type="button" onClick={jump}>
+          <button className="runner-button runner-button--primary runner-button--jump ui-btn" type="button" onClick={jump}>
             ↑ <span>Үсрэх</span>
           </button>
         ) : (
-          <button className="runner-button runner-button--primary" type="button" onClick={startRun}>
+          <button className="runner-button runner-button--primary ui-btn" type="button" onClick={startRun}>
             {game.status === "ended" ? "Дахин уралдах" : "Уралдаж эхлэх"}
           </button>
         )}

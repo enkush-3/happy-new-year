@@ -30,7 +30,7 @@ export default function FortuneCookieGame({ onComplete }: FortuneCookieGameProps
       <h2 id="fortune-title">Ирэх жилийн ерөөл</h2>
       <p className="fortune-intro">Бэлгээ нээгээд шинэ жилийн гурван ерөөлөө уншаарай.</p>
       {!fortunes.length ? (
-        <button className="fortune-open-button" type="button" onClick={revealFortunes}>
+        <button className="fortune-open-button ui-btn" type="button" onClick={revealFortunes}>
           Бэлгээ нээх
         </button>
       ) : (
@@ -38,7 +38,7 @@ export default function FortuneCookieGame({ onComplete }: FortuneCookieGameProps
           <ol className="fortune-list" aria-label="Таны гурван ерөөл" aria-live="polite">
             {fortunes.map((fortune, index) => <li key={fortune}><span>{index + 1}</span>{fortune}</li>)}
           </ol>
-          <button className="fortune-open-button fortune-open-button--tonal" type="button" onClick={revealFortunes}>
+          <button className="fortune-open-button fortune-open-button--tonal ui-btn" type="button" onClick={revealFortunes}>
             Шинэ ерөөл авах
           </button>
         </>

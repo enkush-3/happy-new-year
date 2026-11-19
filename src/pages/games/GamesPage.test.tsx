@@ -21,8 +21,8 @@ describe("games page", () => {
   it("filters the catalog and derives counts from each category", () => {
     renderGamesPage();
 
-    const allGames = screen.getByRole("button", { name: "Бүх тоглоом (5)" });
-    const actionGames = screen.getByRole("button", { name: "Хурд ба авхаалж (4)" });
+    const allGames = screen.getByRole("button", { name: "Бүгд (5)" });
+    const actionGames = screen.getByRole("button", { name: "Авхаалж (4)" });
     const creativeGames = screen.getByRole("button", { name: "Бүтээлч (1)" });
 
     expect(screen.getAllByRole("link")).toHaveLength(5);
@@ -70,7 +70,7 @@ describe("games page", () => {
   it("marks unplayed games as new and keeps the tree workshop nonnumeric", () => {
     renderGamesPage();
 
-    expect(screen.getAllByText("✨ Шинэ — Тоглож үзээгүй").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Тоглож үзээгүй").length).toBeGreaterThan(0);
     const treeCard = screen.getByRole("link", { name: /Гацуураа чимэглэ/ });
     expect(within(treeCard).getByText(/Бүтээлч урлан/)).toBeInTheDocument();
     expect(within(treeCard).queryByText(/Миний рекорд/)).not.toBeInTheDocument();

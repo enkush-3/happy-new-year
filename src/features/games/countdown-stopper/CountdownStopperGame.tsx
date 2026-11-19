@@ -79,9 +79,9 @@ export default function CountdownStopperGame({ onComplete }: CountdownStopperGam
 
       <div className="countdown-stopper__action">
         {status !== "running" ? (
-          <button type="button" className="mini-game__button" onClick={startGame}>{status === "ready" ? "Тоглож эхлэх" : "Дахин тоглох"}</button>
+          <button type="button" className="mini-game__button ui-btn" onClick={startGame}>{status === "ready" ? "Тоглож эхлэх" : "Дахин тоглох"}</button>
         ) : (
-          <button type="button" className="mini-game__button countdown-stopper__stop" onClick={stopGame}>Зогсоох</button>
+          <button type="button" className="mini-game__button countdown-stopper__stop ui-btn" onClick={stopGame}>Зогсоох</button>
         )}
       </div>
 

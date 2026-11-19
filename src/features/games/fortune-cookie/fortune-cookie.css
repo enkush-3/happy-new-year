@@ -4,7 +4,7 @@
 .fortune-gift--open span:nth-child(2) { transform: translateY(-8px) rotate(-7deg); }
 .fortune-game h2 { margin: 0; color: var(--md-sys-color-on-surface, #f7f3ea); font-size: clamp(24px, 5vw, 32px); }
 .fortune-intro { max-width: 42ch; margin: 0; color: var(--md-sys-color-on-surface-variant, #c1c8d7); line-height: 1.6; }
-.fortune-open-button { min-height: 48px; padding: 0 24px; border: 0; border-radius: 999px; background: var(--md-sys-color-primary, #f4cf7d); color: var(--md-sys-color-on-primary, #241a08); font-weight: 700; cursor: pointer; transition: transform 160ms ease, filter 160ms ease; }
+.fortune-open-button { min-height: 48px; padding: 0 24px; border: 0; border-radius: 999px; background: var(--md-sys-color-primary, #f4cf7d); color: var(--md-sys-color-on-primary, #241a08); font-weight: 700; cursor: pointer; transition: transform 120ms var(--ease-standard); }
 .fortune-open-button:hover { filter: brightness(1.08); transform: translateY(-2px); }
 .fortune-open-button:focus-visible { outline: 3px solid var(--md-sys-color-secondary, #e8a0aa); outline-offset: 3px; }
 .fortune-open-button--tonal { background: var(--md-sys-color-secondary-container, #553943); color: var(--md-sys-color-on-secondary-container, #ffdae0); }

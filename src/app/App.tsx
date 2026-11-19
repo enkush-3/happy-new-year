@@ -34,7 +34,7 @@ function NotFoundPage() {
       <p className="eyebrow">❄ ӨВЛИЙН УРЛАН</p>
       <h1>{isUnknownGame ? "Тоглоом олдсонгүй" : "Хуудас олдсонгүй"}</h1>
       <p>Хаягаа шалгаад дахин оролдоорой.</p>
-      <Link className="button button--primary" to="/games">Тоглоомууд руу буцах</Link>
+      <Link className="button button--primary ui-btn" to="/games">Тоглоомууд руу буцах</Link>
     </section>
   );
 }

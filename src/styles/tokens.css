@@ -1,12 +1,14 @@
 :root {
   color-scheme: dark;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-enter: cubic-bezier(0, 0, 0.2, 1);
   font-family: Inter, "Avenir Next", "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 
-  --md-sys-color-primary: #fbbf24;
-  --md-sys-color-on-primary: #281d08;
+  --md-sys-color-primary: #f5b82e;
+  --md-sys-color-on-primary: var(--md-sys-color-surface);
   --md-sys-color-primary-container: #493710;
   --md-sys-color-on-primary-container: #fff0c2;
   --md-sys-color-secondary: #c3cbe0;
@@ -19,17 +21,17 @@
   --md-sys-color-on-tertiary-container: #ffd9df;
   --md-sys-color-error: #ffb4ab;
   --md-sys-color-on-error: #690005;
-  --md-sys-color-surface: #060913;
+  --md-sys-color-surface: #0b0f1a;
   --md-sys-color-on-surface: #f8fafc;
   --md-sys-color-surface-variant: #202b40;
   --md-sys-color-on-surface-variant: #cbd5e1;
-  --md-sys-color-surface-container-lowest: #090f1b;
-  --md-sys-color-surface-container-low: #0f172a;
-  --md-sys-color-surface-container: #172338;
-  --md-sys-color-surface-container-high: #1e293b;
+  --md-sys-color-surface-container-lowest: #0f1421;
+  --md-sys-color-surface-container-low: #111726;
+  --md-sys-color-surface-container: #141b2d;
+  --md-sys-color-surface-container-high: #1b243b;
   --md-sys-color-surface-container-highest: #29364c;
   --md-sys-color-outline: #94a3b8;
-  --md-sys-color-outline-variant: #46536b;
+  --md-sys-color-outline-variant: #243049;
   --md-sys-color-inverse-surface: #e0e4ef;
   --md-sys-color-inverse-on-surface: #202736;
   --md-sys-color-inverse-primary: #8a5700;
@@ -49,11 +51,17 @@
   --md-sys-typescale-body-large: 16px;
   --md-sys-typescale-body-medium: 14px;
 
-  --line: color-mix(in srgb, var(--md-sys-color-outline-variant), transparent 45%);
+  --line: var(--md-sys-color-outline-variant);
   --surface-panel: color-mix(in srgb, var(--md-sys-color-surface-container), transparent 7%);
   --paper: var(--md-sys-color-on-surface);
-  --muted: var(--md-sys-color-on-surface-variant);
+  --muted: var(--md-sys-color-outline);
   --gold: var(--md-sys-color-primary);
+  --gold-text: #fcd34d;
+  --gold-hover: #facc15;
+  --gold-pressed: #d99b16;
+  --control-surface: #1e293b;
+  --control-border: #334155;
+  --control-disabled: #64748b;
   --berry: var(--md-sys-color-tertiary);
   --ice: #a8d4f0;
   --pine: #174b3b;

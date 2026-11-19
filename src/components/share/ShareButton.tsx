@@ -36,7 +36,7 @@ export default function ShareButton({ result }: ShareButtonProps) {
 
   return (
     <div className="share-control">
-      <button type="button" className="button button--primary" onClick={shareResult}>
+      <button type="button" className="button button--primary ui-btn" onClick={shareResult}>
         <span aria-hidden="true">↗</span> Үр дүнгээ хуваалцах
       </button>
       {status && <p className="share-status" role="status" aria-live="polite">{status}</p>}

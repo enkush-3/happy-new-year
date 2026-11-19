@@ -227,13 +227,13 @@ export default function GiftCatcherGame({ onComplete }: GiftCatcherGameProps) {
               <>
                 <span className="mini-game__overlay-icon" aria-hidden="true">🎁</span>
                 <p>30 секундэд аль болох олон бэлэг тосоорой.</p>
-                <button type="button" className="mini-game__button" onClick={startGame}>Тоглож эхлэх</button>
+                <button type="button" className="mini-game__button ui-btn" onClick={startGame}>Тоглож эхлэх</button>
               </>
             ) : (
               <>
                 <span className="mini-game__overlay-icon" aria-hidden="true">{finishedByHazard ? "🪨" : "🎉"}</span>
                 <p>{finishedByHazard ? "Гурван удаа сааданд оногдлоо." : "Раунд дууслаа!"} {game.score} оноо</p>
-                <button type="button" className="mini-game__button" onClick={startGame}>Дахин тоглох</button>
+                <button type="button" className="mini-game__button ui-btn" onClick={startGame}>Дахин тоглох</button>
               </>
             )}
           </div>
@@ -241,9 +241,9 @@ export default function GiftCatcherGame({ onComplete }: GiftCatcherGameProps) {
       </div>
 
       <div className="gift-catcher__mobile-controls" aria-label="Сагсаа удирдах">
-        <button type="button" aria-label="Сагсыг зүүн тийш" disabled={game.status !== "running"} onPointerDown={(event) => onControlPointerDown(event, -1)} onClick={(event) => onControlClick(event, -1)}>←</button>
+        <button type="button" className="ui-btn" aria-label="Сагсыг зүүн тийш" disabled={game.status !== "running"} onPointerDown={(event) => onControlPointerDown(event, -1)} onClick={(event) => onControlClick(event, -1)}>←</button>
         <span>Дарж бариад сагсаа хөдөлгө</span>
-        <button type="button" aria-label="Сагсыг баруун тийш" disabled={game.status !== "running"} onPointerDown={(event) => onControlPointerDown(event, 1)} onClick={(event) => onControlClick(event, 1)}>→</button>
+        <button type="button" className="ui-btn" aria-label="Сагсыг баруун тийш" disabled={game.status !== "running"} onPointerDown={(event) => onControlPointerDown(event, 1)} onClick={(event) => onControlClick(event, 1)}>→</button>
       </div>
       <p className="mini-game__hint">Хулганаар чирэх эсвэл суман товч/A/D дарж бариад сагсаа хөдөлгөнө.</p>
     </section>

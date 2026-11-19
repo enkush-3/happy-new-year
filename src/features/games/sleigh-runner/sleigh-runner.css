@@ -36,6 +36,7 @@
 
 .runner-scene {
   --runner-duration: 1.5s;
+  container-type: inline-size;
   position: relative;
   min-height: clamp(290px, 54vw, 390px);
   overflow: hidden;
@@ -160,12 +161,13 @@
 .runner-ground-dash {
   position: absolute;
   top: 60%;
-  left: 100%;
+  left: 0;
   width: 60px;
   height: 5px;
   border-radius: 99px;
   background: rgba(255,255,255,.82);
   box-shadow: 0 0 12px rgba(255,255,255,.35);
+  transform: translateX(110cqw);
   animation: runner-ground-dash-flow var(--runner-duration) linear infinite;
 }
 
@@ -240,7 +242,6 @@
   height: clamp(96px, 14vw, 112px);
   place-items: end center;
   transform: translateX(-50%);
-  will-change: left;
 }
 
 .runner-tree-obstacle {
@@ -302,7 +303,7 @@
   font-weight: 750;
   cursor: pointer;
   touch-action: manipulation;
-  transition: transform .16s ease, background-color .16s ease;
+  transition: transform 120ms var(--ease-standard);
 }
 
 .runner-button:active { transform: scale(.96); }
@@ -337,8 +338,8 @@
 }
 
 @keyframes runner-ground-dash-flow {
-  from { left: 110%; }
-  to { left: -15%; }
+  from { transform: translateX(110cqw); }
+  to { transform: translateX(-15cqw); }
 }
 
 @keyframes runner-sleigh-bob {

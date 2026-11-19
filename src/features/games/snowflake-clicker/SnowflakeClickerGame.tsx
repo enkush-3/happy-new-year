@@ -152,7 +152,7 @@ export default function SnowflakeClickerGame({ onComplete }: SnowflakeClickerGam
           <button
             key={target.id}
             type="button"
-            className="snowflake-clicker__target"
+            className="snowflake-clicker__target ui-btn"
             style={{ left: `${target.x}%`, top: `${target.y}%` }}
             aria-label="Цасан ширхэг дарах"
             onClick={() => hitTarget(target.id)}
@@ -162,7 +162,7 @@ export default function SnowflakeClickerGame({ onComplete }: SnowflakeClickerGam
           <div className="mini-game__overlay">
             <span className="mini-game__overlay-icon" aria-hidden="true">{game.status === "ready" ? "❄️" : "✨"}</span>
             <p>{game.status === "ready" ? "30 секундэд аль болох олон цасан ширхэг дарна." : `Сорил дууслаа! ${game.hits} цасан ширхэг дарлаа.`}</p>
-            <button type="button" className="mini-game__button" onClick={startGame}>{game.status === "ready" ? "Тоглож эхлэх" : "Дахин тоглох"}</button>
+            <button type="button" className="mini-game__button ui-btn" onClick={startGame}>{game.status === "ready" ? "Тоглож эхлэх" : "Дахин тоглох"}</button>
           </div>
         )}
       </div>
