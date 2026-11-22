@@ -1,0 +1,153 @@
+:root {
+  --game-ui-font: Inter, "Avenir Next", "Segoe UI", sans-serif;
+  --game-ui-page: #0b1120;
+  --game-ui-card: #151e32;
+  --game-ui-elevated: #1e293b;
+  --game-ui-border: #334155;
+  --game-ui-card-border: rgb(51 65 85 / .6);
+  --game-ui-text: #f8fafc;
+  --game-ui-secondary: #cbd5e1;
+  --game-ui-muted: #94a3b8;
+  --game-ui-accent: #f5b731;
+  --game-ui-on-accent: #0f172a;
+  --game-ui-danger: rgb(69 10 10 / .4);
+  --game-ui-danger-text: #fca5a5;
+  --game-ui-danger-border: rgb(239 68 68 / .3);
+}
+
+.game-shell, .game-hud-badge, .game-button {
+  font-family: var(--game-ui-font);
+  font-variant-numeric: tabular-nums;
+}
+
+.game-shell {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+  padding-top: 16px;
+  border-radius: 24px;
+  color: var(--game-ui-text);
+  background: var(--game-ui-page);
+}
+
+.game-shell :is(h1, h2, h3, h4, h5, h6) { font-family: inherit; }
+
+.game-shell__header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px 24px;
+  padding: 0 24px;
+}
+
+.game-shell__heading {
+  display: grid;
+  flex: 1 1 240px;
+  min-width: 0;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+
+.game-shell__kicker {
+  margin: 0;
+  color: var(--game-ui-accent);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.game-shell__title { margin: 0; font-size: 24px; font-weight: 700; line-height: 32px; text-wrap: balance; }
+.game-shell__description { margin: 0; color: var(--game-ui-secondary); font-size: 14px; line-height: 20px; }
+.game-shell__hud { display: flex; min-width: 0; flex-wrap: wrap; gap: 8px; }
+
+.game-shell__surface {
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid var(--game-ui-card-border);
+  border-radius: 24px;
+  background: var(--game-ui-card);
+}
+
+.game-hud-badge {
+  display: inline-flex;
+  min-height: 36px;
+  max-width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 16px;
+  border: 1px solid var(--game-ui-border);
+  border-radius: 999px;
+  color: var(--game-ui-secondary);
+  background: rgb(30 41 59 / .9);
+  font-size: 14px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+.game-hud-badge strong { color: var(--game-ui-text); font-weight: 700; }
+
+.game-button {
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 44px;
+  max-width: 100%;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid var(--game-ui-border);
+  border-radius: 12px;
+  color: var(--game-ui-text);
+  background: var(--game-ui-elevated);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: transform 120ms var(--ease-standard, ease-out);
+}
+
+.game-button--primary {
+  min-height: 48px;
+  border-color: transparent;
+  color: var(--game-ui-on-accent);
+  background: var(--game-ui-accent);
+}
+
+.game-button--destructive {
+  border-color: var(--game-ui-danger-border);
+  color: var(--game-ui-danger-text);
+  background: var(--game-ui-danger);
+}
+
+.game-button--secondary:hover:not(:disabled) { border-color: #64748b; background: #29384f; }
+.game-button--primary:hover:not(:disabled) { background: #ffca55; }
+.game-button--destructive:hover:not(:disabled) { border-color: rgb(239 68 68 / .55); background: rgb(69 10 10 / .6); }
+
+.game-button--secondary:active:not(:disabled) { background: #29384f; }
+.game-button--primary:active:not(:disabled) { background: #e0a522; }
+.game-button--destructive:active:not(:disabled) { background: rgb(69 10 10 / .8); }
+.game-button:active:not(:disabled) { transform: scale(.98); }
+
+.game-button:focus-visible {
+  outline: 2px solid var(--game-ui-accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--game-ui-card);
+}
+
+.game-button:disabled {
+  border-color: var(--game-ui-border);
+  color: var(--game-ui-muted);
+  background: var(--game-ui-elevated);
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-button { transition: none; }
+  .game-button:active:not(:disabled) { transform: none; }
+}
