@@ -11,6 +11,10 @@ import { decodeGameResult, encodeGameResult } from "../../features/games/shared/
 import { bestRecordManager, type BestRecords } from "../../features/games/shared/bestRecords";
 import type { GameId, GameResult } from "../../features/games/shared/types";
 
+const gameShellClasses: Partial<Record<GameId, string>> = {
+  "sleigh-runner": "game-page--sleigh-runner",
+};
+
 export default function GamePage() {
   const { gameId: routeGameId } = useParams();
   const game = findGame(routeGameId);
@@ -57,11 +61,21 @@ export default function GamePage() {
     setSearchParams({}, { replace: true });
   }
 
+  const shellClass = !result ? gameShellClasses[game.id] : undefined;
+  const content = result ? (
+    <GameResultCard result={result} bestRecords={bestRecords} nextGame={nextGame} onReplay={replay} />
+  ) : (
+    <GameInstance gameId={game.id} onComplete={completeGame} />
+  );
+
   return (
-    <section className={`game-page${result ? " is-result" : ""}`} aria-labelledby={result ? "game-result-title" : "game-page-title"}>
+    <section
+      className={`game-page${result ? " is-result" : ""}${shellClass ? ` ${shellClass}` : ""}`}
+      aria-labelledby={shellClass ? undefined : result ? "game-result-title" : "game-page-title"}
+    >
       <div className="game-page-heading">
         <Link to="/games" className={`back-link${result ? " game-result-back" : ""}`}><span aria-hidden="true">←</span> Бүх тоглоом</Link>
-        {!result && (
+        {!result && !shellClass && (
           <>
             <p className="eyebrow"><span aria-hidden="true">✧</span> 2D БАЯРЫН ТОГЛООМ <span aria-hidden="true">✧</span></p>
             <h1 id="game-page-title">{game.title}</h1>
@@ -69,13 +83,9 @@ export default function GamePage() {
           </>
         )}
       </div>
-      <div className={`game-play-surface${result ? " is-result" : ""}`}>
-        {result ? (
-          <GameResultCard result={result} bestRecords={bestRecords} nextGame={nextGame} onReplay={replay} />
-        ) : (
-          <GameInstance gameId={game.id} onComplete={completeGame} />
-        )}
-      </div>
+      {shellClass ? content : (
+        <div className={`game-play-surface${result ? " is-result" : ""}`}>{content}</div>
+      )}
     </section>
   );
 }

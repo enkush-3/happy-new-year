@@ -1,12 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
-import {
-  advanceRunnerFrame,
-  createRunnerState,
-  getJumpHeight,
-  RUNNER_VIEW_DISTANCE,
-  startRunnerState,
-  type SleighRunnerState,
-} from "./model";
+import { useCallback, useEffect, useId, useRef, useState, type MouseEvent, type PointerEvent } from "react";
+import { GameShell, HudBadge, PrimaryButton } from "../../../components/ui/game";
+import { advanceRunnerFrame, createRunnerState, startRunnerState, type SleighRunnerState } from "./model";
+import { drawRunnerScene } from "./runner-canvas";
 import "./sleigh-runner.css";
 
 export interface SleighRunnerResult {
@@ -21,220 +16,251 @@ interface SleighRunnerGameProps {
   onComplete: (result: SleighRunnerResult) => void;
 }
 
-const runnerPlayerPosition = 20;
-
 export default function SleighRunnerGame({ onComplete }: SleighRunnerGameProps) {
   const [game, setGame] = useState(createRunnerState);
   const gameRef = useRef(game);
-  const jumpRequested = useRef(false);
-  const completed = useRef(false);
   const onCompleteRef = useRef(onComplete);
-  gameRef.current = game;
   onCompleteRef.current = onComplete;
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const jumpButtonRef = useRef<HTMLButtonElement>(null);
+  const paint = useRef<(() => void) | null>(null);
+  const jumpSources = useRef(new Set<string>());
+  const pendingInput = useRef({ jumpPressed: false, fastFall: false });
+  const hintId = useId();
 
-  const commit = useCallback((next: SleighRunnerState) => {
+  const updateRun = useCallback((next: SleighRunnerState) => {
+    const previous = gameRef.current;
     gameRef.current = next;
-    setGame(next);
+    paint.current?.();
+
+    // Canvas renders every frame; the HUD only needs the displayed values.
+    if (next.status !== previous.status || next.score !== previous.score || Math.round(next.speed) !== Math.round(previous.speed)) {
+      setGame(next);
+    }
   }, []);
 
-  const jump = useCallback(() => {
-    if (gameRef.current.status === "running" && gameRef.current.jumpRemainingMs <= 0) {
-      jumpRequested.current = true;
+  const pressJump = useCallback((source: string) => {
+    if (gameRef.current.status !== "running" || jumpSources.current.has(source)) return;
+    jumpSources.current.add(source);
+    pendingInput.current.jumpPressed = true;
+  }, []);
+
+  const clearInput = useCallback(() => {
+    jumpSources.current.clear();
+    pendingInput.current = { jumpPressed: false, fastFall: false };
+    gameRef.current = { ...gameRef.current, jumpBufferMs: 0 };
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!context) return;
+
+    let width = 0;
+    let height = 0;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+    function redraw() {
+      if (context && width && height) drawRunnerScene(context, width, height, gameRef.current, reducedMotion.matches);
     }
+
+    function resize() {
+      if (!canvas || !context) return;
+      width = canvas.clientWidth;
+      height = canvas.clientHeight;
+      if (!width || !height) return;
+      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+      const pixelWidth = Math.round(width * pixelRatio);
+      const pixelHeight = Math.round(height * pixelRatio);
+      if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+        canvas.width = pixelWidth;
+        canvas.height = pixelHeight;
+      }
+      context.setTransform(pixelWidth / width, 0, 0, pixelHeight / height, 0, 0);
+      redraw();
+    }
+
+    paint.current = redraw;
+    const observer = new ResizeObserver(resize);
+    observer.observe(canvas);
+    window.addEventListener("resize", resize);
+    reducedMotion.addEventListener("change", redraw);
+    resize();
+    return () => {
+      paint.current = null;
+      observer.disconnect();
+      window.removeEventListener("resize", resize);
+      reducedMotion.removeEventListener("change", redraw);
+    };
   }, []);
 
   useEffect(() => {
     if (game.status !== "running") return;
 
     let animationFrame = 0;
-    let previousFrame: number | null = null;
+    let lastFrameAt = 0;
 
     function frame(now: number) {
-      if (document.visibilityState !== "hidden") {
-        const deltaMs = previousFrame === null ? 0 : now - previousFrame;
-        previousFrame = now;
-        const advanced = advanceRunnerFrame(gameRef.current, deltaMs, jumpRequested.current);
-        jumpRequested.current = false;
-        commit(advanced.state);
+      if (document.visibilityState === "hidden" || gameRef.current.status !== "running") return;
+      const deltaMs = now - lastFrameAt;
+      lastFrameAt = now;
 
-        if (advanced.crashed && !completed.current) {
-          completed.current = true;
+      if (deltaMs > 0) {
+        const next = advanceRunnerFrame(gameRef.current, deltaMs, {
+          ...pendingInput.current,
+          jumpHeld: jumpSources.current.size > 0,
+        });
+        pendingInput.current = { jumpPressed: false, fastFall: false };
+        updateRun(next);
+
+        if (next.status === "ended") {
           onCompleteRef.current({
             gameId: "sleigh-runner",
-            score: advanced.state.score,
-            distance: Math.floor(advanced.state.distance),
-            elapsedMs: Math.floor(advanced.state.elapsedMs),
-            finalSpeed: Math.round(advanced.state.speed),
+            score: next.score,
+            distance: Math.floor(next.distance),
+            elapsedMs: Math.floor(next.elapsedMs),
+            finalSpeed: Math.round(next.speed),
           });
           return;
         }
-      } else {
-        previousFrame = null;
-        jumpRequested.current = false;
       }
-
       animationFrame = window.requestAnimationFrame(frame);
     }
 
-    animationFrame = window.requestAnimationFrame(frame);
-    return () => window.cancelAnimationFrame(animationFrame);
-  }, [game.status, commit]);
+    function syncVisibility() {
+      window.cancelAnimationFrame(animationFrame);
+      if (document.visibilityState === "hidden") {
+        clearInput();
+        return;
+      }
+      lastFrameAt = performance.now();
+      animationFrame = window.requestAnimationFrame(frame);
+    }
+
+    document.addEventListener("visibilitychange", syncVisibility);
+    syncVisibility();
+    return () => {
+      document.removeEventListener("visibilitychange", syncVisibility);
+      window.cancelAnimationFrame(animationFrame);
+    };
+  }, [game.status, updateRun, clearInput]);
 
   useEffect(() => {
     if (game.status !== "running") return;
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (isTextEntryTarget(event.target) || event.repeat) return;
-      const isJumpKey = event.code === "Space" || event.key === " " || event.key === "ArrowUp";
-      if (!isJumpKey) return;
-      if (event.code === "Space" && isInteractiveTarget(event.target)) return;
-      event.preventDefault();
-      jump();
+      if (isTextEntryTarget(event.target) || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      const source = getJumpKey(event);
+      if (source === "space" && event.target !== jumpButtonRef.current && isInteractiveTarget(event.target)) return;
+
+      if (source) {
+        event.preventDefault();
+        if (!event.repeat) pressJump(source);
+      } else if (event.key === "ArrowDown") {
+        event.preventDefault();
+        if (!event.repeat) pendingInput.current.fastFall = true;
+      }
+    }
+
+    function handleKeyUp(event: KeyboardEvent) {
+      const source = getJumpKey(event);
+      if (source) jumpSources.current.delete(source);
     }
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [game.status, jump]);
+    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", clearInput);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", clearInput);
+      clearInput();
+    };
+  }, [game.status, pressJump, clearInput]);
 
   function startRun() {
-    completed.current = false;
-    jumpRequested.current = false;
-    commit(startRunnerState());
+    clearInput();
+    updateRun(startRunnerState());
   }
 
-  const runDuration = (57_600 / game.speed / 1_000).toFixed(2) + "s";
-  const sceneStyle = { "--runner-duration": runDuration } as CSSProperties;
-  const prefersReducedMotion = typeof window !== "undefined" &&
-    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
-  const jumpHeight = getJumpHeight(game.jumpRemainingMs, prefersReducedMotion);
+  function handleJumpPointerDown(event: PointerEvent<HTMLElement>) {
+    if (!event.isPrimary || event.button !== 0 || gameRef.current.status !== "running") return;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    pressJump(`pointer:${event.pointerId}`);
+  }
+
+  function handleJumpPointerEnd(event: PointerEvent<HTMLElement>) {
+    jumpSources.current.delete(`pointer:${event.pointerId}`);
+  }
+
+  function activateJumpButton(event: MouseEvent<HTMLButtonElement>) {
+    if (event.detail === 0 && gameRef.current.status === "running") pendingInput.current.jumpPressed = true;
+  }
 
   return (
-    <section className="runner-game" aria-labelledby="runner-title">
-      <div className="runner-scorebar">
-        <p id="runner-title">Чарганы уралдаан</p>
-        <div>
-          <span>Оноо: <strong data-testid="runner-score">{game.score}</strong></span>
-          <span>Зай: <strong data-testid="runner-distance">{Math.floor(game.distance)} м</strong></span>
-          <span>Хурд: <strong data-testid="runner-speed">{Math.round(game.speed)} м/с</strong></span>
-        </div>
-      </div>
-
-      <div
-        className="runner-scene"
-        role="img"
-        aria-label="Чимэглэсэн гацуур саадтай чарганы 2D уралдаан"
-        style={sceneStyle}
-        onPointerDown={game.status === "running" ? jump : undefined}
-      >
-        <span className="runner-moon" aria-hidden="true">☾</span>
-        <span className="runner-aurora" aria-hidden="true" />
-        <span className="runner-mountain runner-mountain--far" aria-hidden="true" />
-        <span className="runner-mountain runner-mountain--near" aria-hidden="true" />
-        <span className="runner-background-tree runner-background-tree--one" aria-hidden="true">🌲</span>
-        <span className="runner-background-tree runner-background-tree--two" aria-hidden="true">🌲</span>
-        <div className="runner-ground" aria-hidden="true">
-          <span className="runner-ground-line" />
-          <span className="runner-ground-dash" />
-          <span className="runner-ground-dash" />
-          <span className="runner-ground-dash" />
-          <span className="runner-ground-snow" />
-        </div>
-
-        {game.status === "running" && (
-          <>
-            <div
-              className="runner-player"
-              data-testid="runner-player"
-              data-jumping={game.jumpRemainingMs > 0 ? "true" : "false"}
-              style={{
-                left: runnerPlayerPosition + "%",
-                transform: "translate(-50%, " + -jumpHeight + "px)",
-              }}
-              aria-hidden="true"
+    <GameShell
+      className="runner-game"
+      kicker="2D RUNNER"
+      title="Чарганы уралдаан"
+      description="Гацуурыг давж, аль болох хол яваарай."
+      hud={
+        <>
+          <HudBadge>Оноо <strong>{game.score}</strong></HudBadge>
+          <HudBadge>Зай <strong>{Math.floor(game.distance)} м</strong></HudBadge>
+          <HudBadge>Хурд <strong>{Math.round(game.speed)} м/с</strong></HudBadge>
+        </>
+      }
+    >
+      <div className="runner-content">
+        <canvas
+          ref={canvasRef}
+          className="runner-scene"
+          role="img"
+          aria-label="Чарга, гацууртай өвлийн зам"
+          aria-describedby={hintId}
+          onPointerDown={handleJumpPointerDown}
+          onPointerUp={handleJumpPointerEnd}
+          onPointerCancel={handleJumpPointerEnd}
+          onLostPointerCapture={handleJumpPointerEnd}
+        />
+        {game.status === "ended" && <p className="runner-result" role="status">Саадтай мөргөлдлөө! {game.score} оноо</p>}
+        <div className="runner-controls">
+          {game.status === "running" ? (
+            <PrimaryButton
+              ref={jumpButtonRef}
+              className="runner-button"
+              aria-describedby={hintId}
+              onPointerDown={handleJumpPointerDown}
+              onPointerUp={handleJumpPointerEnd}
+              onPointerCancel={handleJumpPointerEnd}
+              onLostPointerCapture={handleJumpPointerEnd}
+              onClick={activateJumpButton}
             >
-              <span className="runner-sleigh-snow" />
-              <span className="runner-sleigh">🛷</span>
-              <span className="runner-sleigh-trail" />
-            </div>
-            {game.obstacles
-              .filter((obstacle) => obstacle.distance - game.distance <= RUNNER_VIEW_DISTANCE)
-              .map((obstacle) => {
-                const gap = obstacle.distance - game.distance;
-                const left = runnerPlayerPosition + gap / RUNNER_VIEW_DISTANCE * (100 - runnerPlayerPosition);
-                return (
-                  <span
-                    key={obstacle.id}
-                    className="runner-obstacle"
-                    data-testid="runner-obstacle"
-                    style={{ left: left + "%" }}
-                    aria-hidden="true"
-                  >
-                    <DecoratedTree />
-                  </span>
-                );
-              })}
-          </>
-        )}
-
-        {game.status === "ended" && (
-          <div className="runner-crash" role="status">
-            <span aria-hidden="true">❄</span>
-            <strong>Саадтай мөргөлдлөө!</strong>
-            <span>{game.score} оноо · {Math.floor(game.distance)} м</span>
-          </div>
-        )}
-        {game.status === "ready" && (
-          <div className="runner-intro">
-            <span aria-hidden="true">🛷</span>
-            <p>Гацуур дээгүүр харайж аль болох хол яваарай.</p>
-          </div>
-        )}
+              <span aria-hidden="true">↑</span> Үсрэх
+            </PrimaryButton>
+          ) : (
+            <PrimaryButton className="runner-button" onClick={startRun} aria-describedby={hintId}>
+              {game.status === "ended" ? "Дахин уралдах" : "Уралдаж эхлэх"}
+            </PrimaryButton>
+          )}
+        </div>
+        <p className="runner-hint" id={hintId}>
+          Space, ↑ эсвэл дэлгэц дээр дарж үсэрнэ. Эрт тавибал нам үсэрнэ. ↓ дарвал хурдан бууна.
+        </p>
       </div>
-
-      <p className="runner-hint">Space, ↑, товшилт эсвэл “Үсрэх” товчоор харайна</p>
-      <div className="runner-controls">
-        {game.status === "running" ? (
-          <button className="runner-button runner-button--primary runner-button--jump ui-btn" type="button" onClick={jump}>
-            ↑ <span>Үсрэх</span>
-          </button>
-        ) : (
-          <button className="runner-button runner-button--primary ui-btn" type="button" onClick={startRun}>
-            {game.status === "ended" ? "Дахин уралдах" : "Уралдаж эхлэх"}
-          </button>
-        )}
-        {game.status === "ended" && (
-          <p className="runner-result">
-            Туулсан зай: <strong>{Math.floor(game.distance)} м</strong> ·
-            Тоглосон хугацаа: <strong>{(game.elapsedMs / 1_000).toFixed(1)} сек</strong> ·
-            Эцсийн хурд: <strong>{Math.round(game.speed)} м/с</strong>
-          </p>
-        )}
-      </div>
-    </section>
+    </GameShell>
   );
 }
 
-function DecoratedTree() {
-  return (
-    <svg className="runner-tree-obstacle" viewBox="0 0 74 112" aria-hidden="true">
-      <ellipse cx="37" cy="105" rx="29" ry="5" fill="rgba(10, 20, 34, .3)" />
-      <path d="M32 79h10v24H32z" fill="#79533b" />
-      <path d="m37 2-18 31h11L12 55h17L5 81h64L45 55h17L44 33h11z" fill="#146b4c" stroke="#c8e4d6" strokeWidth="2" strokeLinejoin="round" />
-      <path d="m37 4-17 30h10L13 56h16L7 79h13L37 8z" fill="#218261" opacity=".7" />
-      <path d="M18 53q16 5 38 0M12 79q22 6 50 0" fill="none" stroke="#f3c75e" strokeWidth="2.5" strokeLinecap="round" />
-      <circle cx="36" cy="35" r="3.6" fill="#f87171" />
-      <circle cx="24" cy="62" r="3.6" fill="#f5cf70" />
-      <circle cx="50" cy="58" r="3.6" fill="#91d8ef" />
-      <circle cx="43" cy="80" r="3.6" fill="#f87171" />
-      <path d="m37 0 2.1 4.6 5 .5-3.7 3.3 1 4.8-4.4-2.5-4.4 2.5 1-4.8-3.7-3.3 5-.5z" fill="#ffd978" />
-    </svg>
-  );
+function getJumpKey(event: KeyboardEvent) {
+  if (event.code === "Space" || event.key === " ") return "space";
+  if (event.key === "ArrowUp") return "up";
+  return null;
 }
 
 function isInteractiveTarget(target: EventTarget | null): boolean {
-  return target instanceof HTMLElement && Boolean(
-    target.closest("button, a, input, textarea, select, [contenteditable]:not([contenteditable='false'])"),
-  );
+  return target instanceof HTMLElement && Boolean(target.closest("button, a, input, textarea, select, [contenteditable]"));
 }
 
 function isTextEntryTarget(target: EventTarget | null): boolean {
