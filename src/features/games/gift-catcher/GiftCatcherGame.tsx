@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent } from "react";
 import { GameShell, HudBadge, PrimaryButton, SecondaryButton } from "../../../components/ui/game";
 import { BasketSprite, FallingSprite, WinterScenery } from "./GiftCatcherArt";
-import { advanceGiftCatcherFrame, GIFT_CATCHER_DURATION_MS, GIFT_CATCHER_RIM_Y, GIFT_CATCHER_STARTING_LIVES, moveBasket, type GiftCatcherFrame } from "./model";
+import { advanceGiftCatcherFrame, GIFT_CATCHER_RIM_Y, GIFT_CATCHER_STARTING_LIVES, moveBasket, type GiftCatcherFrame } from "./model";
 import "./gift-catcher.css";
 
 export interface GiftCatcherResult {
@@ -119,10 +119,10 @@ export default function GiftCatcherGame({ onComplete }: GiftCatcherGameProps) {
       if (document.visibilityState === "hidden") return;
       const current = gameRef.current;
       if (current.status !== "running") return;
-      // Keep the countdown on the visible round clock while the model caps gameplay motion.
-      const roundElapsedMs = Math.min(current.roundElapsedMs + Math.max(0, now - lastFrameAt), GIFT_CATCHER_DURATION_MS);
+      // Count visible play time while the model caps gameplay motion.
+      const frameMs = Math.max(0, now - lastFrameAt);
       const direction = resolveHeldDirection(heldDirections.current);
-      const next = advanceGiftCatcherFrame(current, roundElapsedMs - current.roundElapsedMs, direction, pendingBasketX.current);
+      const next = advanceGiftCatcherFrame(current, frameMs, direction, pendingBasketX.current);
       lastFrameAt = now;
       pendingBasketX.current = null;
 
@@ -134,8 +134,8 @@ export default function GiftCatcherGame({ onComplete }: GiftCatcherGameProps) {
         basketTilt = 0;
       }
 
-      const status = roundElapsedMs >= GIFT_CATCHER_DURATION_MS || next.lives === 0 ? "finished" : "running";
-      commit({ ...next, roundElapsedMs, basketTilt, status, feedback: getCatchFeedback(current, next) });
+      const status = next.lives === 0 ? "finished" : "running";
+      commit({ ...next, roundElapsedMs: current.roundElapsedMs + frameMs, basketTilt, status, feedback: getCatchFeedback(current, next) });
       if (status === "running") animationFrame = window.requestAnimationFrame(frame);
     }
 
@@ -172,7 +172,7 @@ export default function GiftCatcherGame({ onComplete }: GiftCatcherGameProps) {
       });
     }
 
-    if (!game.feedback || game.roundElapsedMs >= GIFT_CATCHER_DURATION_MS) {
+    if (!game.feedback) {
       complete();
       return;
     }
@@ -213,9 +213,8 @@ export default function GiftCatcherGame({ onComplete }: GiftCatcherGameProps) {
     pendingBasketX.current = moveBasket(current.basketX, direction);
   }
 
-  const secondsLeft = Math.ceil((GIFT_CATCHER_DURATION_MS - game.roundElapsedMs) / 1_000);
+  const elapsedSeconds = Math.floor(game.roundElapsedMs / 1_000);
   const isFinished = game.status === "finished";
-  const outOfLives = game.lives === 0;
   const showOverlay = game.status === "ready" || (isFinished && !game.feedback);
 
   return (
@@ -227,7 +226,7 @@ export default function GiftCatcherGame({ onComplete }: GiftCatcherGameProps) {
       hud={
         <>
           <HudBadge aria-live="polite" aria-atomic="true">Оноо <strong>{game.score}</strong></HudBadge>
-          <HudBadge role="timer" aria-label="Үлдсэн хугацаа"><strong>{secondsLeft} сек</strong></HudBadge>
+          <HudBadge role="timer" aria-label="Тоглосон хугацаа"><strong>{elapsedSeconds} сек</strong></HudBadge>
           <HudBadge role="status" aria-label="Амь" aria-atomic="true">
             <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
               <path d="M8 14.3 2.35 8.65a3.55 3.55 0 0 1 5.02-5.02L8 4.26l.63-.63a3.55 3.55 0 0 1 5.02 5.02Z" fill="#f87171" />
@@ -278,8 +277,8 @@ export default function GiftCatcherGame({ onComplete }: GiftCatcherGameProps) {
           )}
           {showOverlay && (
             <div className="gift-catcher__overlay">
-              <span className="gift-catcher__overlay-art"><FallingSprite kind={outOfLives ? "coal" : "gift"} /></span>
-              {isFinished && <p>{outOfLives ? "Гурван удаа сааданд оногдлоо." : "Хугацаа дууслаа."} {game.score} оноо</p>}
+              <span className="gift-catcher__overlay-art"><FallingSprite kind={isFinished ? "coal" : "gift"} /></span>
+              {isFinished && <p>Гурван удаа сааданд оногдлоо. {game.score} оноо</p>}
               <PrimaryButton onClick={startGame}>{game.status === "ready" ? "Тоглож эхлэх" : "Дахин тоглох"}</PrimaryButton>
             </div>
           )}

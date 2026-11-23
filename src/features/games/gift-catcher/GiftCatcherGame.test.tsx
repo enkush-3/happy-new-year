@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import GiftCatcherGame from "./GiftCatcherGame";
-import { advanceGiftCatcherFrame, getFallingSpeedMultiplier, moveBasket, moveBasketContinuously, resolveCatches, type FallingObject, type GiftCatcherFrame } from "./model";
+import { advanceGiftCatcherFrame, getFallingSpeedMultiplier, GIFT_CATCHER_MAX_FALL_SPEED, moveBasket, moveBasketContinuously, resolveCatches, type FallingObject, type GiftCatcherFrame } from "./model";
 
 const initialFrame: GiftCatcherFrame = {
   elapsedMs: 0,
@@ -34,11 +34,12 @@ describe("gift catcher model", () => {
     expect(moveBasketContinuously(92, 1, 500)).toBe(92);
   });
 
-  it("ramps falling speed from 1x to 2.5x over the first 30 seconds", () => {
+  it("keeps increasing fall speed past 30 seconds and approaches the maximum", () => {
     expect(getFallingSpeedMultiplier(0)).toBe(1);
-    expect(getFallingSpeedMultiplier(15_000)).toBe(1.75);
     expect(getFallingSpeedMultiplier(30_000)).toBe(2.5);
-    expect(getFallingSpeedMultiplier(45_000)).toBe(2.5);
+    expect(getFallingSpeedMultiplier(60_000)).toBe(3);
+    expect(getFallingSpeedMultiplier(120_000)).toBeCloseTo(3.4);
+    expect(getFallingSpeedMultiplier(600_000)).toBeLessThan(GIFT_CATCHER_MAX_FALL_SPEED);
   });
 
   it("moves the catcher and falling objects the same distance at 60 Hz and 120 Hz", () => {
@@ -67,7 +68,7 @@ describe("gift catcher model", () => {
 
     expect(after.elapsedMs).toBe(50);
     expect(after.basketX).toBe(23);
-    expect(after.objects[0].y).toBeCloseTo(1.602);
+    expect(after.objects[0].y).toBeCloseTo(1.604, 3);
   });
 
   it("adds gifts and removes a life for hazards caught by the basket", () => {
@@ -121,41 +122,31 @@ describe("GiftCatcherGame", () => {
     expect(basket.style.getPropertyValue("--gift-basket-tilt")).toBe("-6deg");
   });
 
-  it("counts down from 30 seconds and closes the round once at zero", () => {
+  it("continues scoring past the former 30-second limit", () => {
     vi.useFakeTimers();
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     const onComplete = vi.fn();
     render(<GiftCatcherGame onComplete={onComplete} />);
 
-    const timer = screen.getByRole("timer", { name: "Үлдсэн хугацаа" });
-    expect(timer).toHaveTextContent(/^30 сек$/);
+    const timer = screen.getByRole("timer", { name: "Тоглосон хугацаа" });
+    expect(timer).toHaveTextContent(/^0 сек$/);
     expect(screen.getByRole("status", { name: "Амь" })).toHaveTextContent("3");
     expect(screen.getByRole("heading", { level: 1, name: "Бэлэг баригч" })).toHaveClass("game-shell__title");
     expect(screen.getByText("Хулганаар чирэх, A/D эсвэл суман товчоор хөдөлгөнө.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Тоглож эхлэх" }));
 
-    act(() => vi.advanceTimersByTime(1_008));
-    expect(timer).toHaveTextContent(/^29 сек$/);
-    act(() => vi.advanceTimersByTime(28_976));
-    expect(timer).toHaveTextContent(/^1 сек$/);
+    act(() => vi.advanceTimersByTime(61_024));
+    expect(timer).toHaveTextContent(/^61 сек$/);
     expect(onComplete).not.toHaveBeenCalled();
-
-    act(() => vi.advanceTimersByTime(16));
-    expect(timer).toHaveTextContent(/^0 сек$/);
     expect(screen.getByRole("status", { name: "Амь" })).toHaveTextContent("3");
-    expect(screen.getByRole("button", { name: "Сагсыг баруун тийш" })).toBeDisabled();
-    expect(onComplete).toHaveBeenCalledTimes(1);
-    const result = onComplete.mock.calls[0][0];
-    expect(result).toMatchObject({ gameId: "gift-catcher", elapsedMs: 30_000, hazardsHit: 0 });
-    expect(result.giftsCaught).toBeGreaterThan(0);
-    expect(result.score).toBe(result.giftsCaught * 10);
+    expect(screen.getByRole("button", { name: "Сагсыг баруун тийш" })).toBeEnabled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Дахин тоглох" }));
-    expect(timer).toHaveTextContent(/^30 сек$/);
-    expect(screen.getByText("Оноо")).toHaveTextContent("Оноо 0");
+    const scoreBefore = screen.getByText("Оноо").textContent;
+    act(() => vi.advanceTimersByTime(1_400));
+    expect(screen.getByText("Оноо").textContent).not.toBe(scoreBefore);
   });
 
-  it("keeps the countdown accurate when a frame is delayed and caps the movement", () => {
+  it("shows elapsed play time when a frame is delayed and caps the movement", () => {
     const requestFrame = vi.spyOn(window, "requestAnimationFrame").mockReturnValue(1);
     vi.spyOn(performance, "now").mockReturnValue(0);
     render(<GiftCatcherGame onComplete={vi.fn()} />);
@@ -163,11 +154,11 @@ describe("GiftCatcherGame", () => {
     fireEvent.keyDown(window, { key: "ArrowRight" });
 
     act(() => requestFrame.mock.lastCall?.[0](1_200));
-    expect(screen.getByRole("timer", { name: "Үлдсэн хугацаа" })).toHaveTextContent(/^29 сек$/);
+    expect(screen.getByRole("timer", { name: "Тоглосон хугацаа" })).toHaveTextContent(/^1 сек$/);
     expectBasketAt(screen.getByTestId("gift-catcher-basket"), 53);
   });
 
-  it("ends early after the third hazard and retains the score", () => {
+  it("ends after the third hazard, retains the score and resets on replay", () => {
     vi.useFakeTimers();
     vi.spyOn(Math, "random").mockReturnValue(0.5)
       .mockReturnValueOnce(0.5).mockReturnValueOnce(0.5)
@@ -189,6 +180,13 @@ describe("GiftCatcherGame", () => {
     expect(onComplete).toHaveBeenCalledTimes(1);
     expect(onComplete.mock.calls[0][0]).toMatchObject({ gameId: "gift-catcher", hazardsHit: 3, score: 10 });
     expect(onComplete.mock.calls[0][0].elapsedMs).toBeLessThan(30_000);
+    expect(screen.getByRole("status", { name: "Амь" })).toHaveTextContent(/^0$/);
+    expect(screen.getByRole("button", { name: "Сагсыг баруун тийш" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Дахин тоглох" }));
+    expect(screen.getByRole("timer", { name: "Тоглосон хугацаа" })).toHaveTextContent(/^0 сек$/);
+    expect(screen.getByRole("status", { name: "Амь" })).toHaveTextContent(/^3$/);
+    expect(screen.getByText("Оноо")).toHaveTextContent("Оноо 0");
   });
 
   it("cancels opposite held directions and resumes when one is released", () => {
@@ -254,12 +252,12 @@ describe("GiftCatcherGame", () => {
     visibility.mockReturnValue("hidden");
     fireEvent(document, new Event("visibilitychange"));
     act(() => vi.advanceTimersByTime(2_000));
-    expect(screen.getByRole("timer", { name: "Үлдсэн хугацаа" })).toHaveTextContent(/^30 сек$/);
+    expect(screen.getByRole("timer", { name: "Тоглосон хугацаа" })).toHaveTextContent(/^0 сек$/);
     visibility.mockReturnValue("visible");
     fireEvent(document, new Event("visibilitychange"));
     act(() => vi.advanceTimersByTime(1_300));
 
-    expect(screen.getByRole("timer", { name: "Үлдсэн хугацаа" })).toHaveTextContent(/^29 сек$/);
+    expect(screen.getByRole("timer", { name: "Тоглосон хугацаа" })).toHaveTextContent(/^1 сек$/);
   });
 
   it("moves continuously while a touch-friendly arrow is held", () => {
@@ -290,7 +288,7 @@ describe("GiftCatcherGame", () => {
 
   it("moves vector sprites on animation frames and shows brief score feedback on a catch", () => {
     vi.useFakeTimers();
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(Math, "random").mockReturnValue(0.95).mockReturnValueOnce(0.5).mockReturnValueOnce(0.5);
     render(<GiftCatcherGame onComplete={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "Тоглож эхлэх" }));
     act(() => vi.advanceTimersByTime(720));

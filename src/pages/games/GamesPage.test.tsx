@@ -48,7 +48,7 @@ describe("games page", () => {
     expect(giftCard).toHaveAttribute("href", "/games/gift-catcher");
     expect(within(giftCard).queryByRole("link")).not.toBeInTheDocument();
     expect(giftCard.querySelector(".game-card__body")?.tagName).toBe("DIV");
-    expect(within(giftCard).getByText("Авхаалж · 30 сек")).toBeInTheDocument();
+    expect(within(giftCard).getByText("Авхаалж · Хязгааргүй")).toBeInTheDocument();
     expect(within(giftCard).getByText(/нүүрс ба цасан бөмбөг/i)).toBeInTheDocument();
   });
 

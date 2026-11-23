@@ -1,11 +1,10 @@
-export const GIFT_CATCHER_DURATION_MS = 30_000;
 export const GIFT_CATCHER_STARTING_LIVES = 3;
 export const GIFT_CATCHER_BASKET_SPEED_PERCENT_PER_SECOND = 60;
 export const GIFT_CATCHER_STARTING_FALL_SPEED = 1;
-export const GIFT_CATCHER_MAX_FALL_SPEED = 2.5;
+export const GIFT_CATCHER_MAX_FALL_SPEED = 4;
 export const GIFT_CATCHER_RIM_Y = 87;
 
-const fallSpeedRampMs = GIFT_CATCHER_DURATION_MS;
+const fallSpeedRampMs = 30_000;
 const dropIntervalMs = 700;
 const fallSpeedPercentPerSecond = 32;
 const giftCatchHalfWidth = 12;
@@ -45,7 +44,8 @@ export function moveBasketContinuously(position: number, direction: -1 | 0 | 1, 
 }
 
 export function getFallingSpeedMultiplier(elapsedMs: number): number {
-  const progress = clamp(elapsedMs / fallSpeedRampMs, 0, 1);
+  const activeMs = Math.max(0, elapsedMs);
+  const progress = activeMs / (activeMs + fallSpeedRampMs);
   return GIFT_CATCHER_STARTING_FALL_SPEED +
     (GIFT_CATCHER_MAX_FALL_SPEED - GIFT_CATCHER_STARTING_FALL_SPEED) * progress;
 }
@@ -116,10 +116,12 @@ export function resolveCatches(
 }
 
 function getFallDistance(fromMs: number, toMs: number): number {
-  const rampMs = Math.max(0, Math.min(toMs, fallSpeedRampMs) - fromMs);
-  const rampSpeed = getFallingSpeedMultiplier(fromMs + rampMs / 2);
-  const cappedMs = toMs - fromMs - rampMs;
-  return fallSpeedPercentPerSecond * (rampSpeed * rampMs + GIFT_CATCHER_MAX_FALL_SPEED * cappedMs) / 1_000;
+  const deltaMs = toMs - fromMs;
+  const curveTimeMs = fromMs + fallSpeedRampMs;
+  const remainingSpeedGain = GIFT_CATCHER_MAX_FALL_SPEED - getFallingSpeedMultiplier(fromMs);
+  // Integrate the speed curve so fall distance does not depend on the frame rate.
+  const rampArea = remainingSpeedGain * curveTimeMs * Math.log1p(deltaMs / curveTimeMs);
+  return fallSpeedPercentPerSecond * (GIFT_CATCHER_MAX_FALL_SPEED * deltaMs - rampArea) / 1_000;
 }
 
 function clamp(value: number, minimum: number, maximum: number) {
