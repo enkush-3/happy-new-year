@@ -4,12 +4,14 @@ import {
   createRunnerState,
   getMinimumTreeGap,
   getRunnerSpeed,
+  getRunnerTreeDensity,
   RUNNER_CLUSTER_WARMUP_DISTANCE,
   RUNNER_COYOTE_MS,
   RUNNER_JUMP_BUFFER_MS,
   RUNNER_MAX_SPEED,
   RUNNER_START_SPEED,
   RUNNER_TREES,
+  RUNNER_TRIPLE_WARMUP_DISTANCE,
   startRunnerState,
   type RunnerInput,
   type RunnerObstacle,
@@ -101,7 +103,7 @@ describe("sleigh runner model", () => {
     expect(retry.verticalVelocity).toBeLessThan(firstJump.verticalVelocity);
   });
 
-  it("randomizes free gaps above the safe minimum and unlocks clusters after warming up", () => {
+  it("tightens the random gap range and unlocks larger clusters with distance", () => {
     const preview = { ...noTrees, distance: 18, nextObstacleDistance: 50 };
     const early = advanceRunnerFrame(preview, 1, {}, () => 0.99);
     const lowGap = advanceRunnerFrame(preview, 1, {}, () => 0);
@@ -115,16 +117,27 @@ describe("sleigh runner model", () => {
     expect(wideGap.nextObstacleDistance).toBeGreaterThan(lowGap.nextObstacleDistance + 10);
     expect(getMinimumTreeGap(RUNNER_MAX_SPEED)).toBeGreaterThan(getMinimumTreeGap(RUNNER_START_SPEED));
 
-    const warm = advanceRunnerFrame({
-      ...noTrees,
-      distance: RUNNER_CLUSTER_WARMUP_DISTANCE - 30,
-      nextObstacleDistance: RUNNER_CLUSTER_WARMUP_DISTANCE,
+    const midDistance = (RUNNER_CLUSTER_WARMUP_DISTANCE + RUNNER_TRIPLE_WARMUP_DISTANCE) / 2;
+    const lateDistance = RUNNER_TRIPLE_WARMUP_DISTANCE + 450;
+    const waveAt = (distance: number) => advanceRunnerFrame({
+      ...noTrees, distance: distance - 30, nextObstacleDistance: distance,
     }, 1, {}, () => 0.99);
-    expect(warm.obstacles[0].variant).toBe("cluster");
+    const mid = getRunnerTreeDensity(midDistance);
+    const late = getRunnerTreeDensity(lateDistance);
+    expect(mid.maxExtraGap).toBeLessThan(getRunnerTreeDensity(0).maxExtraGap);
+    expect(late.maxExtraGap).toBeLessThan(mid.maxExtraGap);
+    expect(mid.doubleChance).toBeGreaterThan(0);
+    expect(mid.tripleChance).toBe(0);
+    expect(late.tripleChance).toBeGreaterThan(0);
+    expect(waveAt(midDistance).obstacles[0].variant).toBe("cluster");
+    const lateWave = waveAt(lateDistance);
+    expect(lateWave.obstacles[0].variant).toBe("triple");
+    const freeGap = lateWave.nextObstacleDistance - lateDistance - RUNNER_TREES.triple.width;
+    expect(freeGap).toBeCloseTo(getMinimumTreeGap(lateWave.speed) + late.maxExtraGap * 0.99);
   });
 
   it.each([RUNNER_START_SPEED, RUNNER_MAX_SPEED])("can clear successive tall trees and clusters at %i m/s with the tightest spacing", (speed) => {
-    const variants: TreeVariant[] = ["tall", "cluster", "tall", "small"];
+    const variants: TreeVariant[] = ["tall", "cluster", "triple", "tall", "small"];
     const obstacles: RunnerObstacle[] = [];
     let distance = 34;
     for (const variant of variants) {

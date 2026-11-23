@@ -1,4 +1,4 @@
-export type TreeVariant = "small" | "tall" | "cluster";
+export type TreeVariant = "small" | "tall" | "cluster" | "triple";
 
 export interface RunnerObstacle {
   id: number;
@@ -20,6 +20,14 @@ export const RUNNER_TREES: Record<TreeVariant, { width: number; trees: readonly 
     trees: [
       { offset: 0, width: 3.6, height: 4.3 },
       { offset: 3.4, width: 3.8, height: 5.1 },
+    ],
+  },
+  triple: {
+    width: 10.2,
+    trees: [
+      { offset: 0, width: 3.4, height: 4.3 },
+      { offset: 3.25, width: 3.6, height: 4.9 },
+      { offset: 6.65, width: 3.55, height: 4.5 },
     ],
   },
 };
@@ -58,6 +66,7 @@ export const RUNNER_JUMP_SPEED = 40;
 export const RUNNER_JUMP_BUFFER_MS = 100;
 export const RUNNER_COYOTE_MS = 60;
 export const RUNNER_CLUSTER_WARMUP_DISTANCE = 175;
+export const RUNNER_TRIPLE_WARMUP_DISTANCE = 720;
 
 const acceleration = 0.9;
 const gravity = 100;
@@ -70,7 +79,9 @@ const firstObstacleExtraDistance = 12;
 const lookAheadDistance = 64;
 const behindDistance = 16;
 const safetyMargin = RUNNER_SLED_WIDTH + 5;
-const maxRandomExtraGap = 19;
+const finalDensityDistance = 1_400;
+const earlyExtraGap = 32;
+const lateExtraGap = 5;
 const hitboxInset = 0.1;
 
 export function createRunnerState(): SleighRunnerState {
@@ -106,6 +117,18 @@ export function getRunnerSpeed(elapsedMs: number): number {
 
 export function getMinimumTreeGap(speed: number): number {
   return speed * jumpAirTime * 0.85 + safetyMargin;
+}
+
+export function getRunnerTreeDensity(distance: number) {
+  const progress = Math.min(1, Math.max(0, distance) / finalDensityDistance);
+  const doubleProgress = Math.min(1, Math.max(0, distance - RUNNER_CLUSTER_WARMUP_DISTANCE) / (RUNNER_TRIPLE_WARMUP_DISTANCE - RUNNER_CLUSTER_WARMUP_DISTANCE));
+  const tripleProgress = Math.min(1, Math.max(0, distance - RUNNER_TRIPLE_WARMUP_DISTANCE) / (finalDensityDistance - RUNNER_TRIPLE_WARMUP_DISTANCE));
+  const tripleChance = 0.48 * tripleProgress;
+  return {
+    doubleChance: 0.58 * doubleProgress * (1 - tripleChance),
+    tripleChance,
+    maxExtraGap: earlyExtraGap - (earlyExtraGap - lateExtraGap) * progress,
+  };
 }
 
 export function advanceRunnerFrame(
@@ -148,9 +171,10 @@ function advanceStep(state: SleighRunnerState, seconds: number, jumpHeld: boolea
   let nextObstacleId = state.nextObstacleId;
 
   if (nextObstacleDistance <= distance + lookAheadDistance) {
-    const variant = chooseTreeVariant(nextObstacleDistance, random());
+    const density = getRunnerTreeDensity(nextObstacleDistance);
+    const variant = chooseTreeVariant(density, random());
     obstacles.push({ id: nextObstacleId++, distance: nextObstacleDistance, variant });
-    const gap = getMinimumTreeGap(speed) + random() * maxRandomExtraGap;
+    const gap = getMinimumTreeGap(speed) + random() * density.maxExtraGap;
     nextObstacleDistance += RUNNER_TREES[variant].width + gap;
   }
 
@@ -215,9 +239,11 @@ function advanceJump(state: SleighRunnerState, seconds: number, jumpHeld: boolea
   return { height: 0, verticalVelocity: 0, coyoteMs: RUNNER_COYOTE_MS, jumpBufferMs: 0, fastFalling: false, lastLandingMs };
 }
 
-function chooseTreeVariant(distance: number, roll: number): TreeVariant {
-  if (roll >= 0.82 && distance >= RUNNER_CLUSTER_WARMUP_DISTANCE) return "cluster";
-  return roll < 0.62 ? "small" : "tall";
+function chooseTreeVariant({ doubleChance, tripleChance }: ReturnType<typeof getRunnerTreeDensity>, roll: number): TreeVariant {
+  if (roll >= 1 - tripleChance) return "triple";
+  const singleChance = 1 - tripleChance - doubleChance;
+  if (roll >= singleChance) return "cluster";
+  return roll < singleChance * 0.62 ? "small" : "tall";
 }
 
 function hitsTree(distance: number, height: number, obstacle: RunnerObstacle): boolean {

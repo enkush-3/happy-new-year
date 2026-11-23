@@ -54,7 +54,7 @@ describe("shared game result routes", () => {
 
     renderAt(`/games/sleigh-runner?result=${encodeGameResult(result)}`);
 
-    expect(screen.getByRole("heading", { level: 1, name: "Чарганы уралдаан" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Бэлгийн чарга" })).toBeInTheDocument();
     expect(screen.getByText("830", { selector: ".game-result-score" })).toBeInTheDocument();
     expect(screen.getByText("Эцсийн хурд").nextElementSibling).toHaveTextContent("52 м/с");
     expect(document.querySelectorAll(".game-result-stat")).toHaveLength(4);

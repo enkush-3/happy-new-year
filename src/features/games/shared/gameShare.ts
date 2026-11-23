@@ -1,4 +1,5 @@
 import type { GameResult, GameResultPresentation, GameId } from "./types";
+import { SLEIGH_RUNNER_TITLE } from "../gameCatalog";
 import { COUNTDOWN_STOPPER_MAX_TARGET_MS, COUNTDOWN_STOPPER_MIN_TARGET_MS } from "../countdown-stopper/model";
 
 const maxEncodedLength = 2048;
@@ -61,13 +62,13 @@ export function presentGameResult(result: GameResult): GameResultPresentation {
     case "sleigh-runner":
       if (!("score" in result)) {
         return {
-          title: "Чарганы уралдаан",
+          title: SLEIGH_RUNNER_TITLE,
           text: `${result.distance} метр · ${result.giftsCaught} бэлэг цуглууллаа`,
           details: [`Туулсан зай: ${result.distance} м`, `Цуглуулсан бэлэг: ${result.giftsCaught}`],
         };
       }
       return {
-        title: "Чарганы уралдаан",
+        title: SLEIGH_RUNNER_TITLE,
         text: `${result.score} оноо · ${result.distance} метр тууллаа`,
         details: [
           `Тоглосон хугацаа: ${formatSeconds(result.elapsedMs)} сек`,

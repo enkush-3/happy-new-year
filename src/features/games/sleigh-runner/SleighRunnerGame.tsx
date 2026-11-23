@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState, type MouseEvent, type PointerEvent } from "react";
 import { GameShell, HudBadge, PrimaryButton } from "../../../components/ui/game";
+import { SLEIGH_RUNNER_TITLE } from "../gameCatalog";
 import { advanceRunnerFrame, createRunnerState, startRunnerState, type SleighRunnerState } from "./model";
 import { drawRunnerScene } from "./runner-canvas";
 import "./sleigh-runner.css";
@@ -202,7 +203,7 @@ export default function SleighRunnerGame({ onComplete }: SleighRunnerGameProps) 
     <GameShell
       className="runner-game"
       kicker="2D RUNNER"
-      title="Чарганы уралдаан"
+      title={SLEIGH_RUNNER_TITLE}
       description="Гацуурыг давж, аль болох хол яваарай."
       hud={
         <>

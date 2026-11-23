@@ -18,7 +18,7 @@ describe("SleighRunnerGame", () => {
   it("uses a shared shell with three HUD pills and a touch-friendly jump button", () => {
     render(<SleighRunnerGame onComplete={vi.fn()} />);
 
-    const game = screen.getByRole("region", { name: "Чарганы уралдаан" });
+    const game = screen.getByRole("region", { name: "Бэлгийн чарга" });
     expect(within(game).getByText("2D RUNNER")).toBeInTheDocument();
     expect(within(game).getByRole("img", { name: "Чарга, гацууртай өвлийн зам" }).tagName).toBe("CANVAS");
     expect(within(game).getByText("Оноо")).toHaveClass("game-hud-badge");
