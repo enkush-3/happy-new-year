@@ -1,7 +1,29 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import GiftCatcherGame from "./GiftCatcherGame";
-import { getFallingSpeedMultiplier, moveBasket, moveBasketContinuously, resolveCatches, type FallingObject } from "./model";
+import { advanceGiftCatcherFrame, getFallingSpeedMultiplier, moveBasket, moveBasketContinuously, resolveCatches, type FallingObject, type GiftCatcherFrame } from "./model";
+
+const initialFrame: GiftCatcherFrame = {
+  elapsedMs: 0,
+  basketX: 20,
+  objects: [],
+  dropsSpawned: 0,
+  score: 0,
+  giftsCaught: 0,
+  hazardsHit: 0,
+  lives: 3,
+};
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
+
+function expectBasketAt(basket: HTMLElement, position: number) {
+  const renderedPosition = basket.style.getPropertyValue("--gift-basket-x");
+  expect(renderedPosition).toMatch(/cqw$/);
+  expect(Number.parseFloat(renderedPosition)).toBeCloseTo(position, 5);
+}
 
 describe("gift catcher model", () => {
   it("keeps the basket inside the play lane", () => {
@@ -12,11 +34,40 @@ describe("gift catcher model", () => {
     expect(moveBasketContinuously(92, 1, 500)).toBe(92);
   });
 
-  it("ramps falling speed smoothly from 1x to 2.5x across the round", () => {
+  it("ramps falling speed from 1x to 2.5x over the first 30 seconds", () => {
     expect(getFallingSpeedMultiplier(0)).toBe(1);
     expect(getFallingSpeedMultiplier(15_000)).toBe(1.75);
     expect(getFallingSpeedMultiplier(30_000)).toBe(2.5);
     expect(getFallingSpeedMultiplier(45_000)).toBe(2.5);
+  });
+
+  it("moves the catcher and falling objects the same distance at 60 Hz and 120 Hz", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+
+    function playOneSecond(hz: number) {
+      let state = initialFrame;
+      for (let frame = 0; frame < hz; frame += 1) {
+        state = advanceGiftCatcherFrame(state, 1_000 / hz, 1);
+      }
+      return state;
+    }
+
+    const at60Hz = playOneSecond(60);
+    const at120Hz = playOneSecond(120);
+    expect(at60Hz.basketX).toBeCloseTo(80);
+    expect(at120Hz.basketX).toBeCloseTo(at60Hz.basketX, 8);
+    expect(at60Hz.objects).toHaveLength(1);
+    expect(at120Hz.objects).toHaveLength(1);
+    expect(at120Hz.objects[0].y).toBeCloseTo(at60Hz.objects[0].y, 8);
+  });
+
+  it("limits movement and falling distance to 50 ms after a long frame", () => {
+    const before = { ...initialFrame, objects: [{ id: "gift", kind: "gift" as const, x: 50, y: 0 }] };
+    const after = advanceGiftCatcherFrame(before, 3_000, 1);
+
+    expect(after.elapsedMs).toBe(50);
+    expect(after.basketX).toBe(23);
+    expect(after.objects[0].y).toBeCloseTo(1.602);
   });
 
   it("adds gifts and removes a life for hazards caught by the basket", () => {
@@ -32,33 +83,112 @@ describe("gift catcher model", () => {
     expect(result.state).toEqual({ score: 10, giftsCaught: 1, hazardsHit: 1, lives: 2 });
     expect(result.remaining.map(({ id }) => id)).toEqual(["far"]);
   });
+
+  it("catches gifts near the rim while hazards in the same outer area pass through", () => {
+    const falling: FallingObject[] = [
+      { id: "gift", kind: "gift", x: 61.5, y: 81 },
+      { id: "coal", kind: "coal", x: 61.5, y: 87 },
+      { id: "snowball", kind: "snowball", x: 50, y: 81 },
+    ];
+    const result = resolveCatches(initialFrame, falling, 50);
+
+    expect(result.state).toMatchObject({ score: 10, lives: 3 });
+    expect(result.remaining.map(({ id }) => id)).toEqual(["coal", "snowball"]);
+  });
 });
 
 describe("GiftCatcherGame", () => {
-  afterEach(() => vi.useRealTimers());
-
   it("moves continuously while a keyboard direction is held, then stops on release", () => {
-    const onComplete = vi.fn();
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     vi.useFakeTimers();
-    render(<GiftCatcherGame onComplete={onComplete} />);
+    render(<GiftCatcherGame onComplete={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Тоглож эхлэх" }));
     const basket = screen.getByTestId("gift-catcher-basket");
     fireEvent.keyDown(window, { key: "ArrowRight" });
     act(() => vi.advanceTimersByTime(400));
-    expect(basket).toHaveStyle({ left: "74%" });
+    expectBasketAt(basket, 74);
+    expect(basket.style.getPropertyValue("--gift-basket-tilt")).toBe("6deg");
 
     fireEvent.keyUp(window, { key: "ArrowRight" });
     act(() => vi.advanceTimersByTime(250));
-    expect(basket).toHaveStyle({ left: "74%" });
+    expectBasketAt(basket, 74);
+    expect(basket.style.getPropertyValue("--gift-basket-tilt")).toBe("0deg");
 
     fireEvent.keyDown(window, { key: "ф", code: "KeyA" });
     act(() => vi.advanceTimersByTime(200));
-    expect(basket).toHaveStyle({ left: "61.52%" });
+    expectBasketAt(basket, 61.52);
+    expect(basket.style.getPropertyValue("--gift-basket-tilt")).toBe("-6deg");
+  });
 
-    act(() => vi.advanceTimersByTime(30_100));
-    expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ gameId: "gift-catcher", elapsedMs: 30_000 }));
+  it("counts down from 30 seconds and closes the round once at zero", () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const onComplete = vi.fn();
+    render(<GiftCatcherGame onComplete={onComplete} />);
+
+    const timer = screen.getByRole("timer", { name: "Үлдсэн хугацаа" });
+    expect(timer).toHaveTextContent(/^30 сек$/);
+    expect(screen.getByRole("status", { name: "Амь" })).toHaveTextContent("3");
+    expect(screen.getByRole("heading", { level: 1, name: "Бэлэг баригч" })).toHaveClass("game-shell__title");
+    expect(screen.getByText("Хулганаар чирэх, A/D эсвэл суман товчоор хөдөлгөнө.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Тоглож эхлэх" }));
+
+    act(() => vi.advanceTimersByTime(1_008));
+    expect(timer).toHaveTextContent(/^29 сек$/);
+    act(() => vi.advanceTimersByTime(28_976));
+    expect(timer).toHaveTextContent(/^1 сек$/);
+    expect(onComplete).not.toHaveBeenCalled();
+
+    act(() => vi.advanceTimersByTime(16));
+    expect(timer).toHaveTextContent(/^0 сек$/);
+    expect(screen.getByRole("status", { name: "Амь" })).toHaveTextContent("3");
+    expect(screen.getByRole("button", { name: "Сагсыг баруун тийш" })).toBeDisabled();
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    const result = onComplete.mock.calls[0][0];
+    expect(result).toMatchObject({ gameId: "gift-catcher", elapsedMs: 30_000, hazardsHit: 0 });
+    expect(result.giftsCaught).toBeGreaterThan(0);
+    expect(result.score).toBe(result.giftsCaught * 10);
+
+    fireEvent.click(screen.getByRole("button", { name: "Дахин тоглох" }));
+    expect(timer).toHaveTextContent(/^30 сек$/);
+    expect(screen.getByText("Оноо")).toHaveTextContent("Оноо 0");
+  });
+
+  it("keeps the countdown accurate when a frame is delayed and caps the movement", () => {
+    const requestFrame = vi.spyOn(window, "requestAnimationFrame").mockReturnValue(1);
+    vi.spyOn(performance, "now").mockReturnValue(0);
+    render(<GiftCatcherGame onComplete={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Тоглож эхлэх" }));
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+
+    act(() => requestFrame.mock.lastCall?.[0](1_200));
+    expect(screen.getByRole("timer", { name: "Үлдсэн хугацаа" })).toHaveTextContent(/^29 сек$/);
+    expectBasketAt(screen.getByTestId("gift-catcher-basket"), 53);
+  });
+
+  it("ends early after the third hazard and retains the score", () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0.5)
+      .mockReturnValueOnce(0.5).mockReturnValueOnce(0.5)
+      .mockReturnValueOnce(0.7).mockReturnValueOnce(0.5)
+      .mockReturnValueOnce(0.7).mockReturnValueOnce(0.5)
+      .mockReturnValueOnce(0.7).mockReturnValueOnce(0.5);
+    const onComplete = vi.fn();
+    render(<GiftCatcherGame onComplete={onComplete} />);
+    fireEvent.click(screen.getByRole("button", { name: "Тоглож эхлэх" }));
+
+    act(() => vi.advanceTimersByTime(4_000));
+    expect(screen.getByRole("status", { name: "Амь" })).toHaveTextContent("2");
+    expect(onComplete).not.toHaveBeenCalled();
+
+    act(() => vi.advanceTimersByTime(2_000));
+    expect(screen.getByText("−1")).toBeInTheDocument();
+    expect(onComplete).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(360));
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(onComplete.mock.calls[0][0]).toMatchObject({ gameId: "gift-catcher", hazardsHit: 3, score: 10 });
+    expect(onComplete.mock.calls[0][0].elapsedMs).toBeLessThan(30_000);
   });
 
   it("cancels opposite held directions and resumes when one is released", () => {
@@ -70,11 +200,11 @@ describe("GiftCatcherGame", () => {
     fireEvent.keyDown(window, { key: "ArrowLeft" });
     fireEvent.keyDown(window, { key: "ArrowRight" });
     act(() => vi.advanceTimersByTime(250));
-    expect(basket).toHaveStyle({ left: "50%" });
+    expectBasketAt(basket, 50);
 
     fireEvent.keyUp(window, { key: "ArrowLeft" });
     act(() => vi.advanceTimersByTime(200));
-    expect(basket).toHaveStyle({ left: "62.48%" });
+    expectBasketAt(basket, 62.48);
   });
 
   it("stops held movement when the browser window loses focus", () => {
@@ -85,11 +215,11 @@ describe("GiftCatcherGame", () => {
 
     fireEvent.keyDown(window, { key: "ArrowRight" });
     act(() => vi.advanceTimersByTime(200));
-    expect(basket).toHaveStyle({ left: "61.52%" });
+    expectBasketAt(basket, 61.52);
 
     fireEvent(window, new Event("blur"));
     act(() => vi.advanceTimersByTime(200));
-    expect(basket).toHaveStyle({ left: "61.52%" });
+    expectBasketAt(basket, 61.52);
   });
 
   it("does not handle keyboard input while the round is stopped or while typing", () => {
@@ -98,7 +228,7 @@ describe("GiftCatcherGame", () => {
     const basket = screen.getByTestId("gift-catcher-basket");
 
     fireEvent.keyDown(window, { key: "ArrowRight" });
-    expect(basket).toHaveStyle({ left: "50%" });
+    expectBasketAt(basket, 50);
 
     fireEvent.click(screen.getByRole("button", { name: "Тоглож эхлэх" }));
     const input = document.createElement("input");
@@ -109,29 +239,27 @@ describe("GiftCatcherGame", () => {
     fireEvent.keyDown(input, { key: "d" });
     expect(fireEvent.keyDown(input, { key: "ArrowRight" })).toBe(true);
     expect(fireEvent.keyDown(editable, { key: "ArrowRight" })).toBe(true);
-    expect(basket).toHaveStyle({ left: "50%" });
+    expectBasketAt(basket, 50);
 
     input.remove();
     editable.remove();
-    act(() => vi.advanceTimersByTime(30_100));
-    fireEvent.keyDown(window, { key: "ArrowRight" });
-    expect(basket).toHaveStyle({ left: "50%" });
   });
 
   it("pauses the round while the document is hidden", () => {
     vi.useFakeTimers();
+    const visibility = vi.spyOn(document, "visibilityState", "get");
     render(<GiftCatcherGame onComplete={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "Тоглож эхлэх" }));
 
-    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+    visibility.mockReturnValue("hidden");
     fireEvent(document, new Event("visibilitychange"));
     act(() => vi.advanceTimersByTime(2_000));
-    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    expect(screen.getByRole("timer", { name: "Үлдсэн хугацаа" })).toHaveTextContent(/^30 сек$/);
+    visibility.mockReturnValue("visible");
     fireEvent(document, new Event("visibilitychange"));
-    act(() => vi.advanceTimersByTime(300));
+    act(() => vi.advanceTimersByTime(1_300));
 
-    expect(screen.getByText("⏱ 30 сек")).toBeInTheDocument();
-    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    expect(screen.getByRole("timer", { name: "Үлдсэн хугацаа" })).toHaveTextContent(/^29 сек$/);
   });
 
   it("moves continuously while a touch-friendly arrow is held", () => {
@@ -141,18 +269,26 @@ describe("GiftCatcherGame", () => {
     const basket = screen.getByTestId("gift-catcher-basket");
     const button = screen.getByRole("button", { name: "Сагсыг баруун тийш" });
 
-    fireEvent.pointerDown(button, { pointerId: 1 });
+    fireEvent.pointerDown(button, { pointerId: 1, button: 0 });
     act(() => vi.advanceTimersByTime(250));
-    expect(basket).toHaveStyle({ left: "65.36%" });
+    expectBasketAt(basket, 64.4);
     fireEvent.pointerUp(button, { pointerId: 1 });
     act(() => vi.advanceTimersByTime(200));
-    expect(basket).toHaveStyle({ left: "65.36%" });
+    expectBasketAt(basket, 64.4);
 
     fireEvent.click(button, { detail: 1 });
-    expect(basket).toHaveStyle({ left: "65.36%" });
+    expectBasketAt(basket, 64.4);
+
+    const leftButton = screen.getByRole("button", { name: "Сагсыг зүүн тийш" });
+    fireEvent.pointerDown(leftButton, { pointerId: 2, button: 0 });
+    act(() => vi.advanceTimersByTime(200));
+    expectBasketAt(basket, 52.88);
+    fireEvent.lostPointerCapture(leftButton, { pointerId: 2 });
+    act(() => vi.advanceTimersByTime(200));
+    expectBasketAt(basket, 52.88);
   });
 
-  it("transitions falling objects smoothly between timed position updates", () => {
+  it("moves vector sprites on animation frames and shows brief score feedback on a catch", () => {
     vi.useFakeTimers();
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     render(<GiftCatcherGame onComplete={vi.fn()} />);
@@ -160,6 +296,15 @@ describe("GiftCatcherGame", () => {
     act(() => vi.advanceTimersByTime(720));
 
     const fallingGift = screen.getByTestId("falling-gift");
-    expect((fallingGift as HTMLElement).style.transition).toBe("top 16ms linear");
+    const startingTransform = fallingGift.style.transform;
+    expect(fallingGift.querySelector('svg rect[fill="#f5b731"]')).toBeInTheDocument();
+    expect(screen.getByTestId("gift-catcher-basket").querySelector("svg")).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(16));
+    expect(fallingGift.style.transform).not.toBe(startingTransform);
+
+    act(() => vi.advanceTimersByTime(2_528));
+    expect(screen.getByText("+10")).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(400));
+    expect(screen.queryByText("+10")).not.toBeInTheDocument();
   });
 });

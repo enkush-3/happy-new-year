@@ -12,6 +12,7 @@ import { bestRecordManager, type BestRecords } from "../../features/games/shared
 import type { GameId, GameResult } from "../../features/games/shared/types";
 
 const gameShellClasses: Partial<Record<GameId, string>> = {
+  "gift-catcher": "game-page--gift-catcher",
   "sleigh-runner": "game-page--sleigh-runner",
 };
 
