@@ -73,7 +73,7 @@
 .gift-catcher__basket {
   z-index: 2;
   top: var(--gift-rim-y);
-  width: 15cqw;
+  width: var(--gift-catcher-width);
   transform: translate(calc(var(--gift-basket-x) - 50%), -25%);
 }
 

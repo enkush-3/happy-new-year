@@ -1,13 +1,15 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import GiftCatcherGame from "./GiftCatcherGame";
-import { advanceGiftCatcherFrame, getFallingSpeedMultiplier, GIFT_CATCHER_MAX_FALL_SPEED, moveBasket, moveBasketContinuously, resolveCatches, type FallingObject, type GiftCatcherFrame } from "./model";
+import { advanceGiftCatcherFrame, getFallingSpeedMultiplier, getGiftCatcherDifficulty, GIFT_CATCHER_FIRST_DROP_MS, GIFT_CATCHER_MAX_FALL_SPEED, GIFT_CATCHER_WIDTH, moveBasket, moveBasketContinuously, resolveCatches, type FallingObject, type GiftCatcherFrame } from "./model";
 
 const initialFrame: GiftCatcherFrame = {
   elapsedMs: 0,
   basketX: 20,
   objects: [],
   dropsSpawned: 0,
+  nextWaveAtMs: GIFT_CATCHER_FIRST_DROP_MS,
+  safeLaneX: 50,
   score: 0,
   giftsCaught: 0,
   hazardsHit: 0,
@@ -25,6 +27,13 @@ function expectBasketAt(basket: HTMLElement, position: number) {
   expect(Number.parseFloat(renderedPosition)).toBeCloseTo(position, 5);
 }
 
+function mockSingleDrops(...waves: [kindRoll: number, positionRoll: number][]) {
+  const rolls = waves.flatMap(([kind, position]) => [0.99, 0.5, kind, position]);
+  const defaultWave = [0.99, 0.5, 0, 0.5];
+  let roll = 0;
+  vi.spyOn(Math, "random").mockImplementation(() => rolls.shift() ?? defaultWave[roll++ % defaultWave.length]);
+}
+
 describe("gift catcher model", () => {
   it("keeps the basket inside the play lane", () => {
     expect(moveBasket(50, -1)).toBe(44);
@@ -40,6 +49,34 @@ describe("gift catcher model", () => {
     expect(getFallingSpeedMultiplier(60_000)).toBe(3);
     expect(getFallingSpeedMultiplier(120_000)).toBeCloseTo(3.4);
     expect(getFallingSpeedMultiplier(600_000)).toBeLessThan(GIFT_CATCHER_MAX_FALL_SPEED);
+  });
+
+  it("spawns smaller early waves and more frequent mixed hazard waves with a wide dodge lane", () => {
+    const start = getGiftCatcherDifficulty(0);
+    const middle = getGiftCatcherDifficulty(15_000);
+    const late = getGiftCatcherDifficulty(30_000);
+    expect(start.hazardWeight).toBe(0.25);
+    expect(late.hazardWeight).toBe(0.6);
+    expect(middle.intervalMs).toBeLessThan(start.intervalMs);
+    expect(late.intervalMs).toBeLessThan(middle.intervalMs);
+    expect(late.multiChance).toBeGreaterThan(middle.multiChance);
+    expect(late.tripleChance).toBeGreaterThan(middle.tripleChance);
+
+    function spawnAt(elapsedMs: number, rolls: number[]) {
+      return advanceGiftCatcherFrame({ ...initialFrame, elapsedMs: elapsedMs - 16, nextWaveAtMs: elapsedMs }, 16, 0, null, () => rolls.shift() ?? 0);
+    }
+    expect(spawnAt(700, [0.2, 0.5, 0, 0.5]).objects).toHaveLength(1);
+    expect(spawnAt(15_000, [0.2, 0.5, 0.8, 0.5, 0.99, 0.5]).objects).toHaveLength(2);
+
+    for (const laneRoll of [0, 0.2, 0.5, 0.8, 0.999]) {
+      const wave = spawnAt(30_000, [0.2, laneRoll, 0.6, 0.3, 0.99, 0.5, 0.95, 0.8]);
+      expect(wave.objects.map(({ kind }) => kind)).toEqual(["coal", "snowball", "snowball"]);
+      expect(new Set(wave.objects.map(({ x }) => x)).size).toBe(3);
+      expect(new Set(wave.objects.map(({ y }) => y)).size).toBe(1);
+      for (const { x } of wave.objects) {
+        expect(Math.abs(x - wave.safeLaneX) - 12 * 0.85).toBeGreaterThan(GIFT_CATCHER_WIDTH * 1.45 / 2);
+      }
+    }
   });
 
   it("moves the catcher and falling objects the same distance at 60 Hz and 120 Hz", () => {
@@ -96,6 +133,15 @@ describe("gift catcher model", () => {
     expect(result.state).toMatchObject({ score: 10, lives: 3 });
     expect(result.remaining.map(({ id }) => id)).toEqual(["coal", "snowball"]);
   });
+
+  it("caps simultaneous hits at the lives left so the final result remains shareable", () => {
+    const falling: FallingObject[] = [
+      { id: "a", kind: "coal", x: 44, y: 87 },
+      { id: "b", kind: "snowball", x: 56, y: 87 },
+    ];
+    expect(resolveCatches({ ...initialFrame, lives: 1, hazardsHit: 2 }, falling, 50).state)
+      .toMatchObject({ lives: 0, hazardsHit: 3 });
+  });
 });
 
 describe("GiftCatcherGame", () => {
@@ -124,7 +170,7 @@ describe("GiftCatcherGame", () => {
 
   it("continues scoring past the former 30-second limit", () => {
     vi.useFakeTimers();
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    mockSingleDrops();
     const onComplete = vi.fn();
     render(<GiftCatcherGame onComplete={onComplete} />);
 
@@ -160,16 +206,15 @@ describe("GiftCatcherGame", () => {
 
   it("ends after the third hazard, retains the score and resets on replay", () => {
     vi.useFakeTimers();
-    vi.spyOn(Math, "random").mockReturnValue(0.5)
-      .mockReturnValueOnce(0.5).mockReturnValueOnce(0.5)
-      .mockReturnValueOnce(0.7).mockReturnValueOnce(0.5)
-      .mockReturnValueOnce(0.7).mockReturnValueOnce(0.5)
-      .mockReturnValueOnce(0.7).mockReturnValueOnce(0.5);
+    mockSingleDrops([0, 0.2], [0.8, 0.3], [0.99, 0.3], [0.8, 0.3]);
     const onComplete = vi.fn();
     render(<GiftCatcherGame onComplete={onComplete} />);
     fireEvent.click(screen.getByRole("button", { name: "Тоглож эхлэх" }));
 
-    act(() => vi.advanceTimersByTime(4_000));
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    act(() => vi.advanceTimersByTime(496));
+    fireEvent.keyUp(window, { key: "ArrowLeft" });
+    act(() => vi.advanceTimersByTime(3_504));
     expect(screen.getByRole("status", { name: "Амь" })).toHaveTextContent("2");
     expect(onComplete).not.toHaveBeenCalled();
 
@@ -288,7 +333,7 @@ describe("GiftCatcherGame", () => {
 
   it("moves vector sprites on animation frames and shows brief score feedback on a catch", () => {
     vi.useFakeTimers();
-    vi.spyOn(Math, "random").mockReturnValue(0.95).mockReturnValueOnce(0.5).mockReturnValueOnce(0.5);
+    mockSingleDrops([0, 0.5], [0.99, 0.99], [0.99, 0.99]);
     render(<GiftCatcherGame onComplete={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "Тоглож эхлэх" }));
     act(() => vi.advanceTimersByTime(720));

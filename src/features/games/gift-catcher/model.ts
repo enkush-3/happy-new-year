@@ -3,13 +3,22 @@ export const GIFT_CATCHER_BASKET_SPEED_PERCENT_PER_SECOND = 60;
 export const GIFT_CATCHER_STARTING_FALL_SPEED = 1;
 export const GIFT_CATCHER_MAX_FALL_SPEED = 4;
 export const GIFT_CATCHER_RIM_Y = 87;
+export const GIFT_CATCHER_WIDTH = 15;
+export const GIFT_CATCHER_FIRST_DROP_MS = 700;
 
 const fallSpeedRampMs = 30_000;
-const dropIntervalMs = 700;
+const difficultyRampMs = 30_000;
+const minimumWaveIntervalMs = 440;
 const fallSpeedPercentPerSecond = 32;
+const basketMinX = 8;
+const basketMaxX = 92;
 const giftCatchHalfWidth = 12;
 const giftCatchHalfHeight = 7;
 const hazardHitboxScale = 0.85;
+const hazardCatchHalfWidth = giftCatchHalfWidth * hazardHitboxScale;
+const safeLaneHalfWidth = GIFT_CATCHER_WIDTH * 1.45 / 2;
+const maxLaneShift = GIFT_CATCHER_BASKET_SPEED_PERCENT_PER_SECOND * minimumWaveIntervalMs / 1_000 * 0.6;
+const waveColumns = [8, 20, 32, 44, 56, 68, 80, 92];
 
 export type FallingObjectKind = "gift" | "coal" | "snowball";
 
@@ -32,15 +41,17 @@ export interface GiftCatcherFrame extends CatchStats {
   basketX: number;
   objects: FallingObject[];
   dropsSpawned: number;
+  nextWaveAtMs: number;
+  safeLaneX: number;
 }
 
 export function moveBasket(position: number, direction: -1 | 1): number {
-  return clamp(position + direction * 6, 8, 92);
+  return positionBasketAt(position + direction * 6);
 }
 
 export function moveBasketContinuously(position: number, direction: -1 | 0 | 1, deltaMs: number): number {
   const distance = GIFT_CATCHER_BASKET_SPEED_PERCENT_PER_SECOND * Math.max(0, deltaMs) / 1_000;
-  return clamp(position + direction * distance, 8, 92);
+  return positionBasketAt(position + direction * distance);
 }
 
 export function getFallingSpeedMultiplier(elapsedMs: number): number {
@@ -51,7 +62,17 @@ export function getFallingSpeedMultiplier(elapsedMs: number): number {
 }
 
 export function positionBasketAt(position: number): number {
-  return clamp(position, 8, 92);
+  return clamp(position, basketMinX, basketMaxX);
+}
+
+export function getGiftCatcherDifficulty(elapsedMs: number) {
+  const progress = clamp(elapsedMs / difficultyRampMs, 0, 1);
+  return {
+    intervalMs: GIFT_CATCHER_FIRST_DROP_MS - (GIFT_CATCHER_FIRST_DROP_MS - minimumWaveIntervalMs) * progress,
+    hazardWeight: 0.25 + 0.35 * progress,
+    multiChance: 0.72 * progress,
+    tripleChance: 0.34 * progress ** 2,
+  };
 }
 
 export function advanceGiftCatcherFrame(
@@ -59,6 +80,7 @@ export function advanceGiftCatcherFrame(
   frameMs: number,
   direction: -1 | 0 | 1,
   pointerX: number | null = null,
+  random = Math.random,
 ): GiftCatcherFrame {
   const deltaTime = Math.min(Math.max(0, frameMs / 1_000), 0.05);
   const elapsedMs = current.elapsedMs + deltaTime * 1_000;
@@ -67,22 +89,32 @@ export function advanceGiftCatcherFrame(
     : positionBasketAt(pointerX);
   const fallDistance = getFallDistance(current.elapsedMs, elapsedMs);
   const objects = current.objects.map((item) => ({ ...item, y: item.y + fallDistance }));
-  let dropsSpawned = current.dropsSpawned;
-  const nextDropAtMs = (dropsSpawned + 1) * dropIntervalMs;
+  let { dropsSpawned, nextWaveAtMs, safeLaneX } = current;
 
-  if (elapsedMs >= nextDropAtMs) {
-    const roll = Math.random();
-    const kind: FallingObjectKind = roll < 0.68 ? "gift" : roll < 0.84 ? "coal" : "snowball";
-    objects.push({
-      id: `drop-${dropsSpawned++}`,
-      kind,
-      x: 8 + Math.random() * 84,
-      y: -8 + getFallDistance(nextDropAtMs, elapsedMs),
-    });
+  if (elapsedMs >= nextWaveAtMs) {
+    const difficulty = getGiftCatcherDifficulty(nextWaveAtMs);
+    const sizeRoll = random();
+    const count = sizeRoll < difficulty.tripleChance ? 3 : sizeRoll < difficulty.multiChance ? 2 : 1;
+    // Move the safe lane a short, reachable distance between consecutive waves.
+    safeLaneX = clamp(safeLaneX + (random() * 2 - 1) * maxLaneShift, basketMinX + safeLaneHalfWidth, basketMaxX - safeLaneHalfWidth);
+    const available = [...waveColumns];
+    const y = -8 + getFallDistance(nextWaveAtMs, elapsedMs);
+
+    for (let item = 0; item < count; item += 1) {
+      const roll = random();
+      const kind: FallingObjectKind = roll < 1 - difficulty.hazardWeight ? "gift"
+        : roll < 1 - difficulty.hazardWeight / 2 ? "coal" : "snowball";
+      const columns = kind === "gift" ? available
+        : available.filter((x) => Math.abs(x - safeLaneX) > safeLaneHalfWidth + hazardCatchHalfWidth);
+      const x = columns[Math.floor(random() * columns.length)];
+      available.splice(available.indexOf(x), 1);
+      objects.push({ id: `drop-${dropsSpawned++}`, kind, x, y });
+    }
+    nextWaveAtMs += difficulty.intervalMs;
   }
 
   const { state, remaining } = resolveCatches(current, objects, basketX);
-  return { ...state, elapsedMs, basketX, objects: remaining, dropsSpawned };
+  return { ...state, elapsedMs, basketX, objects: remaining, dropsSpawned, nextWaveAtMs, safeLaneX };
 }
 
 export function resolveCatches(
@@ -104,12 +136,13 @@ export function resolveCatches(
     return false;
   });
 
+  const livesLost = Math.min(hazards, state.lives);
   return {
     state: {
       score: state.score + gifts * 10,
       giftsCaught: state.giftsCaught + gifts,
-      hazardsHit: state.hazardsHit + hazards,
-      lives: Math.max(0, state.lives - hazards),
+      hazardsHit: state.hazardsHit + livesLost,
+      lives: state.lives - livesLost,
     },
     remaining,
   };

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent } from "react";
 import { GameShell, HudBadge, PrimaryButton, SecondaryButton } from "../../../components/ui/game";
 import { BasketSprite, FallingSprite, WinterScenery } from "./GiftCatcherArt";
-import { advanceGiftCatcherFrame, GIFT_CATCHER_RIM_Y, GIFT_CATCHER_STARTING_LIVES, moveBasket, type GiftCatcherFrame } from "./model";
+import { advanceGiftCatcherFrame, GIFT_CATCHER_FIRST_DROP_MS, GIFT_CATCHER_RIM_Y, GIFT_CATCHER_STARTING_LIVES, GIFT_CATCHER_WIDTH, moveBasket, type GiftCatcherFrame } from "./model";
 import "./gift-catcher.css";
 
 export interface GiftCatcherResult {
@@ -38,6 +38,8 @@ const emptyGame: GameState = {
   basketTilt: 0,
   objects: [],
   dropsSpawned: 0,
+  nextWaveAtMs: GIFT_CATCHER_FIRST_DROP_MS,
+  safeLaneX: 50,
   score: 0,
   giftsCaught: 0,
   hazardsHit: 0,
@@ -48,6 +50,7 @@ const tiltHoldMs = 120;
 const feedbackDurationMs = 360;
 const arenaStyle = {
   "--gift-rim-y": `${GIFT_CATCHER_RIM_Y}%`,
+  "--gift-catcher-width": `${GIFT_CATCHER_WIDTH}cqw`,
   "--gift-feedback-duration": `${feedbackDurationMs}ms`,
 } as CSSProperties;
 type Direction = -1 | 1;
@@ -278,7 +281,7 @@ export default function GiftCatcherGame({ onComplete }: GiftCatcherGameProps) {
           {showOverlay && (
             <div className="gift-catcher__overlay">
               <span className="gift-catcher__overlay-art"><FallingSprite kind={isFinished ? "coal" : "gift"} /></span>
-              {isFinished && <p>Гурван удаа сааданд оногдлоо. {game.score} оноо</p>}
+              {isFinished && <p>Амь дууслаа. {game.score} оноо</p>}
               <PrimaryButton onClick={startGame}>{game.status === "ready" ? "Тоглож эхлэх" : "Дахин тоглох"}</PrimaryButton>
             </div>
           )}
