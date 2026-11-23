@@ -7,6 +7,7 @@ const results: GameResult[] = [
   { gameId: "snowflake-clicker", score: 45, hits: 45, elapsedMs: 30000 },
   { gameId: "countdown-stopper", elapsedMs: 8_012, targetMs: 8_000, deviationMs: 12, score: 988 },
   { gameId: "sleigh-runner", score: 830, distance: 830, elapsedMs: 18_200, finalSpeed: 520 },
+  { gameId: "gift-catcher", score: 1_230, giftsCaught: 123, hazardsHit: 3, elapsedMs: 126_000 },
 ];
 
 function encodePayload(value: unknown) {

@@ -88,10 +88,10 @@ function isGameResult(value: unknown): value is GameResult {
   const result = value as Record<string, unknown>;
   switch (result.gameId) {
     case "gift-catcher":
-      return isBoundedInt(result.score, 0, 1_000_000) &&
-        isBoundedInt(result.giftsCaught, 0, 1_000_000) &&
+      return isBoundedInt(result.score, 0, Number.MAX_SAFE_INTEGER) &&
+        isBoundedInt(result.giftsCaught, 0, Number.MAX_SAFE_INTEGER) &&
         isBoundedInt(result.hazardsHit, 0, 3) &&
-        isBoundedInt(result.elapsedMs, 0, 30_000);
+        isBoundedInt(result.elapsedMs, 0, Number.MAX_SAFE_INTEGER);
     case "snowflake-clicker":
       return isBoundedInt(result.score, 0, 1_000_000) &&
         isBoundedInt(result.hits, 0, 1_000_000) &&
