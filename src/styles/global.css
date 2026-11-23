@@ -123,7 +123,7 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .button--tonal { color: var(--md-sys-color-on-secondary-container); background: var(--md-sys-color-secondary-container); }
 .button--secondary, .button--quiet { border-color: var(--md-sys-color-outline-variant); color: var(--md-sys-color-on-surface); background: var(--md-sys-color-surface-container-high); }
 .hero-cta { --ui-press-scale: .98; min-width: 210px; margin-top: 24px; }
-.page-heading, .game-page-heading, .tree-workshop__heading, .message-page {
+.page-heading, .game-page-heading, .message-page {
   background-color: var(--md-sys-color-surface);
   box-shadow: 0 0 32px 12px var(--md-sys-color-surface);
 }

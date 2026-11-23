@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TreeGame from "./TreeGame";
@@ -51,7 +51,30 @@ describe("3D tree workshop", () => {
     expect(screen.queryByRole("button", { name: "2D зураг" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Өөрөө модоо зурах" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Сойз" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /3D GLB татах/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "3D татах" })).toBeInTheDocument();
+  });
+
+  it("supports keyboard navigation between workshop tabs", async () => {
+    const user = userEvent.setup();
+    render(<TreeGame />);
+    const ornaments = screen.getByRole("tab", { name: "Чимэглэл" });
+    const edit = screen.getByRole("tab", { name: "Засах" });
+    const tree = screen.getByRole("tab", { name: "Мод" });
+
+    ornaments.focus();
+    await user.keyboard("{ArrowRight}");
+    expect(edit).toHaveFocus();
+    expect(edit).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel", { name: "Засах" })).toBeVisible();
+    expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
+
+    await user.keyboard("{End}");
+    expect(tree).toHaveFocus();
+    await user.keyboard("{Home}");
+    expect(ornaments).toHaveFocus();
+    await user.keyboard("{ArrowLeft}");
+    expect(tree).toHaveFocus();
+    expect(tree).toHaveAttribute("aria-selected", "true");
   });
 
   it("places an ornament on a fixed slot and persists only the slot mapping", async () => {
@@ -60,7 +83,7 @@ describe("3D tree workshop", () => {
     await user.click(screen.getByRole("button", { name: "Улаан бөмбөлөг сонгох" }));
     await user.click(screen.getByRole("button", { name: "Модон дээр байрлуулах" }));
 
-    expect(screen.getByText("✦ 1 / 37")).toBeInTheDocument();
+    expect(screen.getByText("1 / 37")).toBeInTheDocument();
     const shared = decodeTreeFragment(window.location.hash);
     expect(shared.valid).toBe(true);
     expect(shared.design.version).toBe(4);
@@ -71,40 +94,55 @@ describe("3D tree workshop", () => {
     expect(shared.design.lights).toEqual(DEFAULT_TREE_DESIGN.lights);
   });
 
-  it("supports advanced style controls, slot replacement, undo, and erase", async () => {
+  it("supports advanced styling, undo and redo, and removes ornaments from the edit tab", async () => {
     const user = userEvent.setup();
     render(<TreeGame />);
     await user.click(screen.getByRole("button", { name: "Алтан од сонгох" }));
     await user.click(screen.getByRole("button", { name: "Модон дээр байрлуулах" }));
-    await user.click(screen.getByRole("button", { name: "Томруулах" }));
+    expect(screen.queryByRole("button", { name: /устга/i })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Засах" }));
+    expect(within(screen.getByRole("group", { name: "Чимэглэлийн өнгө" })).getAllByRole("button")).toHaveLength(6);
+    await user.click(screen.getByRole("button", { name: "+ Томруулах" }));
     await user.click(screen.getByRole("button", { name: "Мөсөн цэнхэр өнгө" }));
     expect(decodeTreeFragment(window.location.hash).design.decorations[0]).toMatchObject({ slotId: "slot-0", scale: 1.1, color: "#98d8f2" });
     await user.click(screen.getByRole("button", { name: /Буцаах/ }));
     expect(decodeTreeFragment(window.location.hash).design.decorations[0]).toMatchObject({ scale: 1.1, color: "#ffd978" });
-    await user.click(screen.getByRole("button", { name: "Устгагч сонгох" }));
-    await user.click(screen.getByRole("button", { name: "Модон дээр байрлуулах" }));
+    await user.click(screen.getByRole("button", { name: "Дахин хийх" }));
+    expect(decodeTreeFragment(window.location.hash).design.decorations[0]).toMatchObject({ scale: 1.1, color: "#98d8f2" });
+    expect(screen.queryByRole("button", { name: "Сонгосон чимэглэлийг устгах" })).not.toBeInTheDocument();
+    await user.click(screen.getByText("Чимэглэлийг жагсаалтаас сонгох"));
+    await user.click(screen.getByRole("button", { name: "Оройн од" }));
+    await user.click(screen.getByRole("button", { name: "Сонгосон чимэглэлийг устгах" }));
     expect(decodeTreeFragment(window.location.hash).design.decorations).toHaveLength(0);
   });
 
-  it("lets users switch back to selection mode and edit a placed ornament", async () => {
+  it("opens and focuses the edit tab when a placed ornament is clicked with a tool selected", async () => {
     const user = userEvent.setup();
     render(<TreeGame />);
     await user.click(screen.getByRole("button", { name: "Улаан бөмбөлөг сонгох" }));
     await user.click(screen.getByRole("button", { name: "Модон дээр байрлуулах" }));
-    await user.click(screen.getByRole("button", { name: /Сонгох ба нарийн засах/ }));
     await user.click(screen.getByRole("button", { name: "Мөчрийн чимэглэлийг сонгох" }));
+    const edit = screen.getByRole("tab", { name: "Засах" });
+    expect(edit).toHaveAttribute("aria-selected", "true");
+    expect(edit).toHaveFocus();
     expect(screen.getByText("Чимэглэлийн өнцөг тааруулах")).toBeInTheDocument();
+    expect(screen.getByText("Байрлал #1", { selector: ".tree-workshop__position" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /устга/i })).toHaveLength(1);
+    expect(decodeTreeFragment(window.location.hash).design.decorations).toHaveLength(1);
   });
 
   it("applies 1-degree rotation controls to the selected ornament and new placements", async () => {
     const user = userEvent.setup();
     render(<TreeGame />);
 
+    await user.click(screen.getByRole("tab", { name: "Засах" }));
     fireEvent.change(screen.getByRole("slider", { name: "Хөндлөн өнцөг" }), { target: { value: "41" } });
+    await user.click(screen.getByRole("tab", { name: "Чимэглэл" }));
     await user.click(screen.getByRole("button", { name: "Улаан бөмбөлөг сонгох" }));
     await user.click(screen.getByRole("button", { name: "Модон дээр байрлуулах" }));
     expect(decodeTreeFragment(window.location.hash).design.decorations[0]).toMatchObject({ rotX: 0, rotY: 41 });
 
+    await user.click(screen.getByRole("tab", { name: "Засах" }));
     fireEvent.change(screen.getByRole("slider", { name: "Босоо өнцөг" }), { target: { value: "-17" } });
     expect(decodeTreeFragment(window.location.hash).design.decorations[0]).toMatchObject({ rotX: -17, rotY: 41 });
     await user.click(screen.getByRole("button", { name: "Хөндлөн өнцгийг 1°-аар нэмэх" }));
@@ -116,6 +154,7 @@ describe("3D tree workshop", () => {
   it("toggles, recolors, dims, and shares the animated light settings", async () => {
     const user = userEvent.setup();
     render(<TreeGame />);
+    await user.click(screen.getByRole("tab", { name: "Мод" }));
     const toggle = screen.getByRole("checkbox", { name: "Гэрлийг асаах" });
     expect(toggle).toBeChecked();
     await user.click(toggle);
@@ -138,7 +177,7 @@ describe("3D tree workshop", () => {
     Object.defineProperty(mockedNavigator, "share", { configurable: true, value: share });
     Object.defineProperty(mockedNavigator, "clipboard", { configurable: true, value: { writeText } });
     vi.stubGlobal("navigator", mockedNavigator);
-    await user.click(screen.getByRole("button", { name: /Хуваалцах/ }));
+    await user.click(screen.getByRole("button", { name: "Модоо хуваалцах" }));
     expect(share).toHaveBeenCalledWith(expect.objectContaining({ url: expect.stringContaining("#tree=") }));
     await user.click(screen.getByRole("button", { name: "Линк хуулах" }));
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining("#tree="));
@@ -148,7 +187,7 @@ describe("3D tree workshop", () => {
   it("shows a selectable share link when clipboard access is unavailable", async () => {
     const user = userEvent.setup();
     render(<TreeGame />);
-    await user.click(screen.getByRole("button", { name: /Хуваалцах/ }));
+    await user.click(screen.getByRole("button", { name: "Модоо хуваалцах" }));
     const input = screen.getByLabelText("Модны share линк") as HTMLInputElement;
     expect(input.value).toContain(window.location.origin);
     expect(input.value).toContain("#tree=");
@@ -157,13 +196,13 @@ describe("3D tree workshop", () => {
   it("exports the current decorated tree to PNG and GLB", async () => {
     const user = userEvent.setup();
     render(<TreeGame />);
-    await user.click(screen.getByRole("button", { name: /PNG зураг татах/ }));
+    await user.click(screen.getByRole("button", { name: "PNG татах" }));
     await waitFor(() => expect(downloadTreePng).toHaveBeenCalledOnce());
     expect(sceneHarness.markerVisibility).toEqual([false, true]);
     expect(sceneHarness.haloVisibility).toEqual([false, true]);
-    await user.click(screen.getByRole("button", { name: /3D GLB татах/ }));
+    await user.click(screen.getByRole("button", { name: "3D татах" }));
     await waitFor(() => expect(downloadTreeGlb).toHaveBeenCalledWith(sceneHarness.root));
-    expect(screen.getByRole("button", { name: /3D GLB татах/ })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "3D татах" })).toBeEnabled();
   });
 
   it("migrates old drawn tree links by retaining ornaments and showing a notice", () => {
@@ -173,7 +212,7 @@ describe("3D tree workshop", () => {
     render(<TreeGame />);
 
     expect(screen.getByText(/гараар зурсан хэсгийг цэвэрлэлээ/i)).toBeInTheDocument();
-    expect(screen.getByText("✦ 1 / 37")).toBeInTheDocument();
+    expect(screen.getByText("1 / 37")).toBeInTheDocument();
     expect(decodeTreeFragment(window.location.hash).design.decorations).toHaveLength(1);
   });
 

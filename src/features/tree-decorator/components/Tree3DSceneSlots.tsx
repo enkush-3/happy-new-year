@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { SecondaryButton } from "../../../components/ui/game";
 import type { OrnamentKind, TreeDecoration, TreeDesign, TreeTheme } from "../model/tree-state";
 import { getDecorationSlotId, TREE_CONE_TIERS, TREE_SLOTS, TREE_THEMES } from "../model/tree-state";
 import type { TreeCameraView, TreeExportControls, TreePlacement } from "./Tree3DScene";
@@ -12,6 +13,7 @@ export interface SlotTree3DSceneProps {
   design: TreeDesign;
   selectedDecorationId: string | null;
   selectedKind: OrnamentKind | null;
+  describedBy?: string;
   viewMode: "edit" | "orbit";
   cameraViewRef: MutableRefObject<TreeCameraView>;
   onExportRoot: (root: import("three").Object3D | null) => void;
@@ -351,8 +353,13 @@ export default function Tree3DSceneSlots(props: SlotTree3DSceneProps) {
     const distance = point ? Math.hypot(event.clientX - gesture.start.x, event.clientY - gesture.start.y) : Infinity;
     const shouldClick = gesture.pointers.size === 1 && !gesture.dragged && distance <= clickSlop;
     if (shouldClick) {
-      const slotId = raycastSlot(runtime, event.clientX, event.clientY, event.currentTarget.querySelector("canvas"));
-      if (slotId) propsRef.current.onSlotClick(slotId);
+      const canvas = event.currentTarget.querySelector("canvas");
+      const decorationId = raycastDecoration(runtime, event.clientX, event.clientY, canvas);
+      if (decorationId) propsRef.current.onSelect(decorationId);
+      else {
+        const slotId = raycastSlot(runtime, event.clientX, event.clientY, canvas);
+        if (slotId) propsRef.current.onSlotClick(slotId);
+      }
     }
     gesture.pointers.delete(event.pointerId);
     if (gesture.pointers.size === 0) gestureRef.current = null;
@@ -426,11 +433,21 @@ export default function Tree3DSceneSlots(props: SlotTree3DSceneProps) {
   }
 
   return (
-    <div ref={hostRef} className="tree-3d-shell is-orbiting" role="group" aria-label="3D гацуурыг чирж эргүүлэх; цэг дээр товшиж чимэглэх" tabIndex={0} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel} onKeyDown={onKeyDown}>
-      {status === "loading" && <p className="tree-3d-status" role="status">3D модыг бэлдэж байна…</p>}
-      {status === "fallback" && <p className="tree-3d-status" role="status">3D дүрслэл ачаалж чадсангүй. Хуудсыг дахин ачаална уу.</p>}
-      {status === "ready" && <span className="tree-3d-instructions" aria-live="polite">Чирж модыг эргүүл · Мөчрийн цэгийг товшиж чимэглэ · Touchpad-аар эргүүлж, хулганын дугуйгаар ойртуул</span>}
-    </div>
+    <>
+      <div ref={hostRef} className="tree-3d-shell is-orbiting" role="group" aria-label="3D гацуур" aria-describedby={props.describedBy} tabIndex={0} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel} onKeyDown={onKeyDown}>
+        {status === "loading" && <p className="tree-3d-status" role="status">3D модыг бэлдэж байна…</p>}
+        {status === "fallback" && <p className="tree-3d-status" role="status">3D дүрслэл ачаалж чадсангүй. Хуудсыг дахин ачаална уу.</p>}
+      </div>
+      {status === "ready" && (
+        <div className="tree-workshop__camera" role="group" aria-label="3D камерын удирдлага">
+          <SecondaryButton aria-label="Камер ойртуулах" title="Ойртуулах" onClick={() => zoomCamera(-0.35)}>+</SecondaryButton>
+          <SecondaryButton aria-label="Камер холдуулах" title="Холдуулах" onClick={() => zoomCamera(0.35)}>−</SecondaryButton>
+          <SecondaryButton aria-label="Камер тэглэх" title="Тэглэх" onClick={resetCamera}>
+            ↺ <span>Тэглэх</span>
+          </SecondaryButton>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -856,13 +873,33 @@ function propsDesign(runtime: Runtime) {
 }
 
 function raycastSlot(runtime: Runtime, x: number, y: number, canvas: HTMLCanvasElement | null): string | null {
-  if (!canvas) return null;
-  const rect = canvas.getBoundingClientRect();
-  if (!rect.width || !rect.height) return null;
-  runtime.pointer.set(((x - rect.left) / rect.width) * 2 - 1, -((y - rect.top) / rect.height) * 2 + 1);
-  runtime.raycaster.setFromCamera(runtime.pointer, runtime.camera);
+  if (!setPointerRay(runtime, x, y, canvas)) return null;
   const hits = runtime.raycaster.intersectObjects([...runtime.markers.values()].map(({ target }) => target), false);
   return typeof hits[0]?.object.userData.slotId === "string" ? hits[0].object.userData.slotId : null;
+}
+
+function raycastDecoration(runtime: Runtime, x: number, y: number, canvas: HTMLCanvasElement | null): string | null {
+  if (!runtime.ornaments.size || !setPointerRay(runtime, x, y, canvas)) return null;
+  const hit = runtime.raycaster.intersectObjects([...runtime.ornaments.values()], true)
+    .find(({ object }) => object.visible && object.userData.selectionHalo !== true);
+  if (!hit) return null;
+  const foliage = runtime.raycaster.intersectObjects(runtime.foliage, false)[0];
+  if (foliage && foliage.distance < hit.distance) return null;
+
+  for (let object: import("three").Object3D | null = hit.object; object && object !== runtime.treeRoot; object = object.parent) {
+    const decoration = object.userData.decoration as TreeDecoration | undefined;
+    if (decoration) return decoration.id;
+  }
+  return null;
+}
+
+function setPointerRay(runtime: Runtime, x: number, y: number, canvas: HTMLCanvasElement | null) {
+  if (!canvas) return false;
+  const rect = canvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) return false;
+  runtime.pointer.set(((x - rect.left) / rect.width) * 2 - 1, -((y - rect.top) / rect.height) * 2 + 1);
+  runtime.raycaster.setFromCamera(runtime.pointer, runtime.camera);
+  return true;
 }
 
 function gestureMetrics(pointers: Map<number, PointerPoint>) {
